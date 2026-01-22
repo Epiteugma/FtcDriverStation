@@ -104,7 +104,7 @@ export function loop() {
     }
 }
 
-export function sendCommand(name: string, extra: any) {
+export function sendCommand(name: string, extra?: any) {
     if (!connection.remote) return;
 
     let command = new Command();
@@ -112,7 +112,7 @@ export function sendCommand(name: string, extra: any) {
     command.timestamp = BigInt(Date.now());
     command.seqNum = ++connection.seqNum;
     command.name = name;
-    command.extra = extra;
+    command.extra = extra || '';
 
     window.robocol.sendPacket(command.serialize().buffer as ArrayBuffer, connection.remote);
     connection.commandQueue.set(command, 1);
@@ -137,6 +137,8 @@ function handle(packet: DeserializeResult, from: string) {
         connection.seqNum = 0;
         connection.lastPing = 0;
         connection.lastHeartbeat = Date.now();
+
+        sendCommand('CMD_REQUEST_OP_MODE_LIST', '');
     }
 
     if (connection.remote !== from) return;
@@ -161,7 +163,7 @@ function handleTelemetry(packet: Telemetry) {
 function handleCommand(packet: Command) {
     if (packet.acknowledged) { // incoming ACK
         for (let [command] of connection.commandQueue) {
-            if (command.name !== packet.name || command.seqNum !== packet.seqNum) continue;
+            if (command.name !== packet.name || command.timestamp !== packet.timestamp) continue;
 
             connection.commandQueue.delete(command);
             break;
@@ -172,15 +174,18 @@ function handleCommand(packet: Command) {
 
     let ack = new Command(); // outgoing ACK
 
-    ack.timestamp = BigInt(Date.now());
+    ack.timestamp = packet.timestamp;
     ack.seqNum = packet.seqNum;
     ack.name = packet.name;
+    ack.acknowledged = true;
 
     window.robocol.sendPacket(ack.serialize().buffer as ArrayBuffer, connection.remote);
 
+    console.log('got command:', packet.name, packet.extra);
+
     switch (packet.name) {
         case 'CMD_NOTIFY_OP_MODE_LIST':
-            console.log('got OpMode list:', packet.extra);
+            
             break;
     }
 }

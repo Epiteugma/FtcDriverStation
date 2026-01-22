@@ -25,7 +25,7 @@
         bind(gamepads);
 
         if (gamepad1.index >= 0) {
-            if (gamepad1.index < gamepads.length) update(gamepads, gamepad1);
+            if (gamepads[gamepad1.index]) update(gamepads, gamepad1);
             else {
                 gamepad1.index = -1;
                 gamepad1.latestData.timestamp = BigInt(Date.now());
@@ -33,7 +33,7 @@
         }
 
         if (gamepad2.index >= 0) {
-            if (gamepad2.index < gamepads.length) update(gamepads, gamepad2);
+            if (gamepads[gamepad2.index]) update(gamepads, gamepad2);
             else {
                 gamepad2.index = -1;
                 gamepad2.latestData.timestamp = BigInt(Date.now());
