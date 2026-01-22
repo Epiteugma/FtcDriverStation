@@ -1,0 +1,3 @@
+[submodule "src/librobocol"]
+	path = src/librobocol
+	url = https://github.com/Epiteugma/librobocol
