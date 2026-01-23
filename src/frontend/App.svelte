@@ -32,7 +32,7 @@
         return (state === RobotState.Running ? '[Running]' : '[Init]') + ' ' + opMode;
     }
 
-    loop();
+    setInterval(loop);
 </script>
 
 <Navbar bind:tab />
