@@ -1,6 +1,8 @@
 <script lang="ts">
-    import GamepadPacket, { GamepadType } from '../librobocol/packets/gamepad';
+    import GamepadPacket from '../librobocol/packets/gamepad';
     import Gamepad from './Gamepad.svelte';
+
+    const DEADZONE = 0.05;
 
     let {
         gamepad1 = $bindable({
@@ -41,6 +43,14 @@
         }
     }
 
+    function cleanStickValue(v: number) {
+        if (v < DEADZONE || v > -DEADZONE) v = 0;
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+
+        return v;
+    }
+
     function update(gamepads: globalThis.Gamepad[], gamepad: any) {
         let data = gamepads[gamepad.index];
         let packet = gamepad.latestData ? gamepad.latestData as GamepadPacket : new GamepadPacket();
@@ -69,12 +79,12 @@
         packet.dpadLeft = data.buttons[14].pressed;
         packet.dpadRight = data.buttons[15].pressed;
 
-        packet.leftStickX = data.axes[0];
-        packet.leftStickY = data.axes[1];
-        packet.rightStickX = data.axes[2];
-        packet.rightStickY = data.axes[3];
+        packet.leftStickX = cleanStickValue(data.axes[0]);
+        packet.leftStickY = cleanStickValue(data.axes[1]);
+        packet.rightStickX = cleanStickValue(data.axes[2]);
+        packet.rightStickY = cleanStickValue(data.axes[3]);
 
-        if (!gamepad.start && (gamepad === gamepad1 && !gamepad.a || !gamepad.b)) {
+        if (!gamepad.start && (gamepad === gamepad1 && !gamepad.a || gamepad == gamepad2 && !gamepad.b)) {
             gamepad.bindLock = false;
         }
 

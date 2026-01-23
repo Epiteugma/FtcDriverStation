@@ -1,4 +1,7 @@
 :root {
-    --red: #a00;
+    --red: #f00;
+    --orange: #fa0;
     --green: #0a0;
+
+    --primary: #6030fe;
 }

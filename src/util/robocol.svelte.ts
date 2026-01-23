@@ -2,7 +2,6 @@ import { deserialize, type DeserializeResult } from '../librobocol/serialization
 import PeerDiscovery, { PeerType } from '../librobocol/packets/peerDiscovery';
 import Heartbeat from '../librobocol/packets/heartbeat';
 import Telemetry from '../librobocol/packets/telemetry';
-import Gamepad from '../librobocol/packets/gamepad';
 import { RobotState } from '../librobocol/types';
 import Command from '../librobocol/packets/command';
 
@@ -31,27 +30,51 @@ export const connection = $state({
     },
 });
 
+export const DEFAULT_OP_MODE_NAME = '$Stop$Robot$';
+
 export const robot = $state({
     batteryLevel: 0,
     state: RobotState.Unknown,
-})
+
+    opModes: null,
+    activeOpMode: DEFAULT_OP_MODE_NAME,
+
+    systemTelemetry: null,
+    telemetry: null,
+});
+
+export const TELEMETRY_SYSTEM_NONE_KEY = '$System$None$';
+export const TELEMETRY_SYSTEM_ERROR_KEY = '$System$Error$';
+export const TELEMETRY_SYSTEM_WARNING_KEY = '$System$Warning$';
 
 const BATTERY_LEVEL_KEY = '$Robot$Battery$Level$';
 const NO_VOLTAGE_SENSOR_KEY = '$no$voltage$sensor$';
 const ASSUME_DISCONNECT_TIMER = 2000;
 
 const discovery = new PeerDiscovery().serialize();
-const unassignedGamepad = new Gamepad(); unassignedGamepad.id = -1;
+
+export enum Commands {
+    InitOpMode = 'CMD_INIT_OP_MODE',
+    RunOpMode = 'CMD_RUN_OP_MODE',
+
+    RequestActiveConfig = 'CMD_REQUEST_ACTIVE_CONFIG',
+    RequestUserDeviceTypes = 'CMD_REQUEST_USER_DEVICE_TYPES',
+    RequestOpModeList = 'CMD_REQUEST_OP_MODE_LIST',
+
+    NotifyOpModeList = 'CMD_NOTIFY_OP_MODE_LIST',
+    ShowStacktrace = 'CMD_SHOW_STACKTRACE',
+}
 
 export function loop() {
-    requestAnimationFrame(loop);
-
     if (!connection.active || Date.now() - connection.lastHeartbeat > ASSUME_DISCONNECT_TIMER && !!connection.remote) {
         connection.remote = null;
         connection.seqNum = 0;
 
         robot.state = RobotState.Unknown;
         robot.batteryLevel = 0;
+
+        robot.opModes = [];
+        robot.activeOpMode = DEFAULT_OP_MODE_NAME;
         return;
     }
 
@@ -74,31 +97,15 @@ export function loop() {
     }
 
     if (connection.gamepad1.latestData && connection.gamepad1.lastSent < Number(connection.gamepad1.latestData.timestamp)) {
-        if (connection.gamepad1.index === -1) {
-            unassignedGamepad.timestamp = BigInt(Date.now());
-            unassignedGamepad.seqNum = ++connection.seqNum;
-            unassignedGamepad.user = 1;
-
-            window.robocol.sendPacket(unassignedGamepad.serialize().buffer, connection.remote);
-        } else {
-            connection.gamepad1.latestData.seqNum = ++connection.seqNum;
-            window.robocol.sendPacket(connection.gamepad1.latestData.serialize().buffer, connection.remote);
-        }
+        connection.gamepad1.latestData.seqNum = ++connection.seqNum;
+        window.robocol.sendPacket(connection.gamepad1.latestData.serialize().buffer, connection.remote);
 
         connection.gamepad1.lastSent = Date.now();
     }
 
     if (connection.gamepad2.latestData && connection.gamepad2.lastSent < Number(connection.gamepad2.latestData.timestamp)) {
-        if (connection.gamepad2.index === -1) {
-            unassignedGamepad.timestamp = BigInt(Date.now());
-            unassignedGamepad.seqNum = ++connection.seqNum;
-            unassignedGamepad.user = 2;
-
-            window.robocol.sendPacket(unassignedGamepad.serialize().buffer, connection.remote);
-        } else {
-            connection.gamepad2.latestData.seqNum = ++connection.seqNum;
-            window.robocol.sendPacket(connection.gamepad2.latestData.serialize().buffer, connection.remote);
-        }
+        connection.gamepad2.latestData.seqNum = ++connection.seqNum;
+        window.robocol.sendPacket(connection.gamepad2.latestData.serialize().buffer, connection.remote);
 
         connection.gamepad2.lastSent = Date.now();
     }
@@ -138,7 +145,9 @@ function handle(packet: DeserializeResult, from: string) {
         connection.lastPing = 0;
         connection.lastHeartbeat = Date.now();
 
-        sendCommand('CMD_REQUEST_OP_MODE_LIST', '');
+        sendCommand(Commands.RequestActiveConfig);
+        sendCommand(Commands.RequestUserDeviceTypes);
+        sendCommand(Commands.RequestOpModeList);
     }
 
     if (connection.remote !== from) return;
@@ -153,6 +162,11 @@ function handle(packet: DeserializeResult, from: string) {
 
 function handleTelemetry(packet: Telemetry) {
     robot.state = packet.robotState;
+
+    if (packet.tag === TELEMETRY_SYSTEM_ERROR_KEY || packet.tag === TELEMETRY_SYSTEM_WARNING_KEY || packet.tag === TELEMETRY_SYSTEM_NONE_KEY) {
+        robot.systemTelemetry = packet;
+        return;
+    }
 
     if (packet.dataStrings.has(BATTERY_LEVEL_KEY)) {
         let batteryLevel = packet.dataStrings.get(BATTERY_LEVEL_KEY);
@@ -181,11 +195,12 @@ function handleCommand(packet: Command) {
 
     window.robocol.sendPacket(ack.serialize().buffer as ArrayBuffer, connection.remote);
 
-    console.log('got command:', packet.name, packet.extra);
-
     switch (packet.name) {
-        case 'CMD_NOTIFY_OP_MODE_LIST':
-            
+        case Commands.NotifyOpModeList:
+            robot.opModes = packet.extra;
+            break;
+        case Commands.ShowStacktrace:
+            setTimeout(() => alert(packet.extra), 10); // TODO: refactor!
             break;
     }
 }

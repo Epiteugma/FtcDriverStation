@@ -3,21 +3,46 @@
     import Battery from './Battery.svelte';
     import Gamepads from './Gamepads.svelte';
     import Link from './Link.svelte';
-    import RobotControl from './tabs/RobotControl.svelte';
 
-    import { connection, robot, loop } from '../util/robocol.svelte';
+    import RobotControl from './tabs/RobotControl.svelte';
+    import Configuration from './tabs/Configuration.svelte';
+    import ProgramManage from './tabs/ProgramManage.svelte';
+
+    import { RobotState } from '../librobocol/types';
+    import { connection, robot, loop, DEFAULT_OP_MODE_NAME } from '../util/robocol.svelte';
+
+    const tabs = [RobotControl, Configuration, ProgramManage];
+
+    let tab = $state(0);
+    let pad = $derived(tab < 2);
+
+    let Tab = $derived(tabs[tab]);
+
+    function stringifyState(state: RobotState, opMode = DEFAULT_OP_MODE_NAME) {
+        let map = {
+            [RobotState.Unknown]: 'Unknown',
+            [RobotState.NotStarted]: 'Not Started',
+            [RobotState.Stopped]: 'Stopped',
+            [RobotState.EmergencyStop]: 'Emergency Stop'
+        };
+
+        if (map[state]) return map[state];
+        if (opMode === DEFAULT_OP_MODE_NAME) return 'Idle';
+
+        return (state === RobotState.Running ? '[Running]' : '[Init]') + ' ' + opMode;
+    }
 
     loop();
 </script>
 
-<Navbar />
+<Navbar bind:tab />
 
 <div class="content">
     <div class="status-bar">
         <div class="indicators">
             <span style="width: 120px">
                 {#if !!connection.remote}
-                    Connected
+                    {stringifyState(robot.state, robot.activeOpMode)}
                 {:else}
                     Disconnected
                 {/if}
@@ -33,12 +58,15 @@
         <div class="close" onclick={() => window.close()}></div>
     </div>
 
-    <RobotControl />
+    <div class="holder" class:pad>
+        <Tab />
+    </div>
 </div>
 
 <style>
     .content {
         flex: 1;
+        overflow: auto;
         display: flex;
         flex-direction: column;
     }
@@ -94,5 +122,18 @@
     .close::after {
         width: 100%;
         height: 4px;
+    }
+
+    .holder {
+        flex: 1;
+        overflow-x: hidden;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .pad {
+        padding: 15px;
     }
 </style>
