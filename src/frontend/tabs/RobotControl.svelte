@@ -1,6 +1,6 @@
 <script lang="ts">
     import OpModeSelector from '../OpModeSelector.svelte';
-    import { sendCommand, robot, DEFAULT_OP_MODE_NAME, Commands, TELEMETRY_SYSTEM_NONE_KEY, TELEMETRY_SYSTEM_WARNING_KEY } from '../../util/robocol.svelte';
+    import { sendCommand, robot, DEFAULT_OP_MODE_NAME, Commands, TELEMETRY_SYSTEM_NONE_KEY, TELEMETRY_SYSTEM_WARNING_KEY, OpModeState } from '../../util/robocol.svelte';
     import { RobotState } from '../../librobocol/types';
 
     let selected = $state('');
@@ -16,7 +16,9 @@
         let out = '';
 
         for (let [key, value] of robot.telemetry.dataStrings) {
-            out += key + ' : ' + value + '\n';
+            if (key.startsWith('$') && key.endsWith('$')) continue;
+            
+            out += value + '\n';
         }
 
         for (let [key, value] of robot.telemetry.dataNumbers) {
@@ -30,14 +32,14 @@
 <OpModeSelector opModes={robot.opModes} bind:selected />
 
 <div class="controls">
-    <button class="{robot.state === RobotState.Init ? 'run' : ''}" disabled={
-        !selected || robot.state !== RobotState.Init && (robot.state !== RobotState.Running || robot.activeOpMode !== DEFAULT_OP_MODE_NAME)
+    <button class="{robot.opModeState === OpModeState.Init ? 'run' : ''}" disabled={
+        !selected || robot.state !== RobotState.Running || robot.opModeState !== OpModeState.Init && (robot.opModeState !== OpModeState.Looping || robot.activeOpMode !== DEFAULT_OP_MODE_NAME)
     } onclick={() => {
-        sendCommand(robot.state == RobotState.Running ? Commands.InitOpMode : Commands.RunOpMode, selected);
-    }}>{robot.state === RobotState.Init ? 'Run' : 'Init'}</button>
+        sendCommand(robot.opModeState == OpModeState.Looping ? Commands.InitOpMode : Commands.RunOpMode, selected);
+    }}>{robot.opModeState === OpModeState.Init ? 'Run' : 'Init'}</button>
 
     <button class="danger" disabled={
-        (robot.state !== RobotState.Init && robot.state !== RobotState.Running) || robot.activeOpMode === DEFAULT_OP_MODE_NAME
+        robot.state !== RobotState.Running || (robot.opModeState !== OpModeState.Init && robot.opModeState !== OpModeState.Looping) || robot.activeOpMode === DEFAULT_OP_MODE_NAME
     } onclick={() => sendCommand(Commands.InitOpMode, DEFAULT_OP_MODE_NAME)}>Stop</button>
 </div>
 

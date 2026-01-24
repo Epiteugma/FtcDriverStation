@@ -32,11 +32,16 @@ export const connection = $state({
 
 export const DEFAULT_OP_MODE_NAME = '$Stop$Robot$';
 
+export enum OpModeState {
+    Init, Looping
+}
+
 export const robot = $state({
     batteryLevel: 0,
     state: RobotState.Unknown,
 
     opModes: null,
+    opModeState: OpModeState.Looping,
     activeOpMode: DEFAULT_OP_MODE_NAME,
 
     systemTelemetry: null,
@@ -63,6 +68,7 @@ export enum Commands {
 
     NotifyOpModeList = 'CMD_NOTIFY_OP_MODE_LIST',
     NotifyInitOpMode = 'CMD_NOTIFY_INIT_OP_MODE',
+    NotifyRunOpMode = 'CMD_NOTIFY_RUN_OP_MODE',
     ShowStacktrace = 'CMD_SHOW_STACKTRACE',
 }
 
@@ -176,6 +182,8 @@ function handleTelemetry(packet: Telemetry) {
         let batteryLevel = packet.dataStrings.get(BATTERY_LEVEL_KEY);
         robot.batteryLevel = batteryLevel === NO_VOLTAGE_SENSOR_KEY ? 0 : (parseFloat(batteryLevel) || 0);
     }
+
+    robot.telemetry = packet;
 }
 
 function handleCommand(packet: Command) {
@@ -205,7 +213,11 @@ function handleCommand(packet: Command) {
             break;
         case Commands.NotifyInitOpMode:
             robot.activeOpMode = packet.extra;
-            robot.state = RobotState.Init;
+            robot.opModeState = OpModeState.Init;
+            break;
+        case Commands.NotifyRunOpMode:
+            robot.activeOpMode = packet.extra;
+            robot.opModeState = OpModeState.Looping;
             break;
         case Commands.ShowStacktrace:
             window.open(window.location.href + '?' + new URLSearchParams({

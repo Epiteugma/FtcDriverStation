@@ -50,5 +50,5 @@ function _sendPacket(packet: ArrayBuffer, to: string) {
 }
 
 function _onPacket(packet: ArrayBuffer, from: RemoteInfo) {
-    window.webContents.send('packet', packet, from.address);
+    if (window && !window.isDestroyed()) window.webContents.send('packet', packet, from.address);
 }

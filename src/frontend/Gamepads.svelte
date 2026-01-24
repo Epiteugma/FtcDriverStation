@@ -44,7 +44,7 @@
     }
 
     function cleanStickValue(v: number) {
-        if (v < DEADZONE || v > -DEADZONE) v = 0;
+        if (v > 0 && v < DEADZONE || v < 0 && v > -DEADZONE) v = 0;
         if (v < -1) v = -1;
         if (v > 1) v = 1;
 
@@ -110,11 +110,13 @@
                 gamepad1.bindLock = true;
 
                 gamepad2.index = gamepad2.index === data.index ? -1 : gamepad2.index;
+                if (gamepad2.latestData) gamepad2.latestData.timestamp = BigInt(Date.now());
             } else if (data.buttons[1].pressed) {
                 gamepad2.index = data.index;
                 gamepad2.bindLock = true;
 
                 gamepad1.index = gamepad1.index === data.index ? -1 : gamepad1.index;
+                if (gamepad1.latestData) gamepad1.latestData.timestamp = BigInt(Date.now());
             }
         }
     }

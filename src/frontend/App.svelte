@@ -9,7 +9,7 @@
     import ProgramManage from './tabs/ProgramManage.svelte';
 
     import { RobotState } from '../librobocol/types';
-    import { connection, robot, loop, DEFAULT_OP_MODE_NAME } from '../util/robocol.svelte';
+    import { connection, robot, loop, DEFAULT_OP_MODE_NAME, OpModeState } from '../util/robocol.svelte';
 
     const tabs = [RobotControl, Configuration, ProgramManage];
 
@@ -22,6 +22,7 @@
         let map = {
             [RobotState.Unknown]: 'Unknown',
             [RobotState.NotStarted]: 'Not Started',
+            [RobotState.Init]: 'Init',
             [RobotState.Stopped]: 'Stopped',
             [RobotState.EmergencyStop]: 'Emergency Stop'
         };
@@ -29,7 +30,7 @@
         if (map[state]) return map[state];
         if (opMode === DEFAULT_OP_MODE_NAME) return 'Idle';
 
-        return (state === RobotState.Running ? '[Running]' : '[Init]') + ' ' + opMode;
+        return opMode;
     }
 
     setInterval(loop);
@@ -40,8 +41,19 @@
 <div class="content">
     <div class="status-bar">
         <div class="indicators">
-            <span style="width: 120px">
+            <span class="robot-state">
                 {#if !!connection.remote}
+                    {#if robot.state == RobotState.Running && robot.activeOpMode !== DEFAULT_OP_MODE_NAME}
+                        {#if robot.opModeState == OpModeState.Init}
+                            <svg class="init" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960">
+                                <path d="M360-320h80v-320h-80v320Zm160 0h80v-320h-80v320ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z"/>
+                            </svg>
+                        {:else}
+                            <svg class="running" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960">
+                                <path d="m380-300 280-180-280-180v360ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z"/>
+                            </svg>
+                        {/if}
+                    {/if}
                     {stringifyState(robot.state, robot.activeOpMode)}
                 {:else}
                     Disconnected
@@ -87,6 +99,19 @@
         -webkit-app-region: drag;
         justify-content: space-around;
         flex: 1;
+    }
+
+    .robot-state {
+        width: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 5px;
+    }
+
+    .robot-state svg {
+        height: 24px;
     }
 
     .close {
