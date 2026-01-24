@@ -25,6 +25,24 @@ function init() {
 
     // window.setMenu(null);
     window.loadFile('assets/index.html');
+
+    window.webContents.setWindowOpenHandler((details) => {
+        let url = new URL(details.url);
+        if (url.protocol !== 'file:') return { action: 'deny' };
+
+        return {
+            action: 'allow',
+            overrideBrowserWindowOptions: {
+                frame: false,
+                resizable: false,
+                width: 800,
+                height: 400,
+                webPreferences: {
+                    preload: join(app.getAppPath(), 'dist/preload.js'),
+                },
+            }
+        };
+    });
 }
 
 function _sendPacket(packet: ArrayBuffer, to: string) {

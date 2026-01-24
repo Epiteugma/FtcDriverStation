@@ -9,7 +9,7 @@ export const connection = $state({
     remote: null,
     active: true,
 
-    commandQueue: new Map<Command, number>(),
+    commandQueue: new Map<Command, number[]>(),
 
     seqNum: 0,
     lastPing: 0,
@@ -62,6 +62,7 @@ export enum Commands {
     RequestOpModeList = 'CMD_REQUEST_OP_MODE_LIST',
 
     NotifyOpModeList = 'CMD_NOTIFY_OP_MODE_LIST',
+    NotifyInitOpMode = 'CMD_NOTIFY_INIT_OP_MODE',
     ShowStacktrace = 'CMD_SHOW_STACKTRACE',
 }
 
@@ -78,7 +79,7 @@ export function loop() {
         return;
     }
 
-    if (Date.now() - connection.lastPing > 100) {
+    if (Date.now() - connection.lastPing > 200) {
         connection.lastPing = Date.now();
 
         if (!!connection.remote) {
@@ -89,12 +90,13 @@ export function loop() {
             heartbeat.timezoneId = 'GMT';
 
             window.robocol.sendPacket(heartbeat.serialize().buffer, connection.remote);
-            retryQueuedCommands();
         } else {
             window.robocol.sendPacket(discovery.buffer, '192.168.43.1');
             window.robocol.sendPacket(discovery.buffer, '192.168.49.1');
         }
     }
+
+    processQueuedCommands();
 
     if (connection.gamepad1.latestData && connection.gamepad1.lastSent < Number(connection.gamepad1.latestData.timestamp)) {
         connection.gamepad1.latestData.seqNum = ++connection.seqNum;
@@ -122,15 +124,17 @@ export function sendCommand(name: string, extra?: any) {
     command.extra = extra || '';
 
     window.robocol.sendPacket(command.serialize().buffer as ArrayBuffer, connection.remote);
-    connection.commandQueue.set(command, 1);
+    connection.commandQueue.set(command, [1, Date.now()]);
 }
 
-function retryQueuedCommands() {
+function processQueuedCommands() {
     let commandQueue = connection.commandQueue.entries();
 
-    for (let [command, attempts] of commandQueue) {
+    for (let [command, [attempts, lastSent]] of commandQueue) {
+        if (Date.now() - lastSent < 100) continue;
+
         window.robocol.sendPacket(command.serialize().buffer as ArrayBuffer, connection.remote);
-        connection.commandQueue.set(command, ++attempts);
+        connection.commandQueue.set(command, [++attempts, Date.now()]);
 
         if (attempts > 10) connection.commandQueue.delete(command);
     }
@@ -199,8 +203,15 @@ function handleCommand(packet: Command) {
         case Commands.NotifyOpModeList:
             robot.opModes = packet.extra;
             break;
+        case Commands.NotifyInitOpMode:
+            robot.activeOpMode = packet.extra;
+            robot.state = RobotState.Init;
+            break;
         case Commands.ShowStacktrace:
-            setTimeout(() => alert(packet.extra), 10); // TODO: refactor!
+            window.open(window.location.href + '?' + new URLSearchParams({
+                stackTrace: packet.extra
+            }).toString());
+            
             break;
     }
 }

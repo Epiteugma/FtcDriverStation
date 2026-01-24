@@ -16,7 +16,7 @@
     });
 </script>
 
-{#if errored}
+{#if errored || !loaded}
     <span>Disconnected</span>
 {/if}
 
