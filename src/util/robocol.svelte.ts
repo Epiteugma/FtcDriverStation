@@ -105,9 +105,7 @@ export function loop() {
 
     processQueuedCommands();
 
-    if (connection.gamepad1.latestData && connection.gamepad1.lastSent < Number(connection.gamepad1.latestData.timestamp)) {
-        console.log('shitting out gamepad1 update');
-        
+    if (connection.gamepad1.latestData && connection.gamepad1.lastSent < Number(connection.gamepad1.latestData.timestamp)) {        
         if (connection.gamepad1.index === -1) {
             connection.gamepad1.latestData = new Gamepad();
             connection.gamepad1.latestData.timestamp = BigInt(Date.now());
@@ -122,8 +120,6 @@ export function loop() {
     }
 
     if (connection.gamepad2.latestData && connection.gamepad2.lastSent < Number(connection.gamepad2.latestData.timestamp)) {
-        console.log('shitting out gamepad2 update');
-
         if (connection.gamepad2.index === -1) {
             connection.gamepad2.latestData = new Gamepad();
             connection.gamepad2.latestData.timestamp = BigInt(Date.now());

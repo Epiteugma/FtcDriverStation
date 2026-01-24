@@ -1,18 +1,25 @@
 <script lang="ts">
     let { opModes = null, selected = $bindable('') } = $props();
+
+    let sortedOpModes = $derived(opModes ? Array.from(opModes).sort(sortOpModes) : null);
+
+    let autoOpModes: any[] = $derived(sortedOpModes ? sortedOpModes.filter((o: any) => o.flavor === 'AUTONOMOUS') : null);
+    let teleOpModes: any[] = $derived(sortedOpModes ? sortedOpModes.filter((o: any) => o.flavor === 'TELEOP') : null);
+
+    function sortOpModes(a: any, b: any) {
+        return a.group.localeCompare(b.group) || a.name.localeCompare(b.name);
+    }
 </script>
 
 <div class="holder">
     <div class="selector-holder">
         <div class="selector">
             <select bind:value={selected}>
-                {#if !opModes || !opModes.filter(o => o.flavor === 'AUTONOMOUS').length}
+                {#if !opModes || !autoOpModes.length}
                     <option disabled>No OpModes found</option>
                 {:else}
-                    {#each opModes as opMode}
-                    {#if opMode.flavor === 'AUTONOMOUS'}
+                    {#each autoOpModes as opMode}
                         <option value={opMode.name}>{opMode.name}</option>
-                    {/if}
                     {/each}
                 {/if}
             </select>
@@ -26,13 +33,11 @@
 
         <div class="selector">
             <select bind:value={selected}>
-                {#if !opModes || !opModes.filter(o => o.flavor === 'TELEOP').length}
+                {#if !opModes || !teleOpModes.length}
                     <option disabled>No OpModes found</option>
                 {:else}
-                    {#each opModes as opMode}
-                    {#if opMode.flavor === 'TELEOP'}
+                    {#each teleOpModes as opMode}
                         <option value={opMode.name}>{opMode.name}</option>
-                    {/if}
                     {/each}
                 {/if}
             </select>
