@@ -7,7 +7,7 @@
 
     let systemTelemetry = $derived.by(() => {
         if (!robot.systemTelemetry || robot.systemTelemetry.tag === TELEMETRY_SYSTEM_NONE_KEY) return '';
-        return robot.systemTelemetry.dataStrings.get(robot.systemTelemetry.tag);
+        return robot.systemTelemetry.dataStrings.get(robot.systemTelemetry.tag) + '\n\n';
     });
 
     let userTelemetry = $derived.by(() => {
@@ -33,7 +33,7 @@
 
 <div class="controls">
     <button class="{robot.opModeState === OpModeState.Init ? 'run' : ''}" disabled={
-        !selected || robot.state !== RobotState.Running || robot.opModeState !== OpModeState.Init && (robot.opModeState !== OpModeState.Looping || robot.activeOpMode !== DEFAULT_OP_MODE_NAME)
+        robot.opModes.findIndex((o: any) => o.name === selected) < 0 || robot.state !== RobotState.Running || robot.opModeState !== OpModeState.Init && (robot.opModeState !== OpModeState.Looping || robot.activeOpMode !== DEFAULT_OP_MODE_NAME)
     } onclick={() => {
         sendCommand(robot.opModeState == OpModeState.Looping ? Commands.InitOpMode : Commands.RunOpMode, selected);
     }}>{robot.opModeState === OpModeState.Init ? 'Run' : 'Init'}</button>
