@@ -33,7 +33,7 @@
 
 <div class="controls">
     <button class="{robot.opModeState === OpModeState.Init ? 'run' : ''}" disabled={
-        robot.opModes.findIndex((o: any) => o.name === selected) < 0 || robot.state !== RobotState.Running || robot.opModeState !== OpModeState.Init && (robot.opModeState !== OpModeState.Looping || robot.activeOpMode !== DEFAULT_OP_MODE_NAME)
+        robot.opModes?.findIndex((o: any) => o.name === selected) < 0 || robot.state !== RobotState.Running || robot.opModeState !== OpModeState.Init && (robot.opModeState !== OpModeState.Looping || robot.activeOpMode !== DEFAULT_OP_MODE_NAME)
     } onclick={() => {
         sendCommand(robot.opModeState == OpModeState.Looping ? Commands.InitOpMode : Commands.RunOpMode, selected);
     }}>{robot.opModeState === OpModeState.Init ? 'Run' : 'Init'}</button>

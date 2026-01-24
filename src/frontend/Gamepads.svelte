@@ -2,19 +2,19 @@
     import GamepadPacket from '../librobocol/packets/gamepad';
     import Gamepad from './Gamepad.svelte';
 
-    const DEADZONE = 0.05;
+    const DEADZONE = 0.1;
 
     let {
         gamepad1 = $bindable({
             index: -1,
             latestData: null,
-            lastSent: 0,
+            needsUpdate: false,
             bindLock: false,
         }),
         gamepad2 = $bindable({
             index: -1,
             latestData: null,
-            lastSent: 0,
+            needsUpdate: false,
             bindLock: false,
         })
     } = $props();
@@ -30,7 +30,7 @@
             if (gamepads[gamepad1.index]) update(gamepads, gamepad1);
             else {
                 gamepad1.index = -1;
-                gamepad1.latestData.timestamp = BigInt(Date.now());
+                gamepad1.needsUpdate = true;
             }
         }
 
@@ -38,7 +38,7 @@
             if (gamepads[gamepad2.index]) update(gamepads, gamepad2);
             else {
                 gamepad2.index = -1;
-                gamepad2.latestData.timestamp = BigInt(Date.now());
+                gamepad2.needsUpdate = true;
             }
         }
     }
@@ -95,8 +95,8 @@
             else gamepad.b = false;
         }
 
-        packet.timestamp = BigInt(Date.now() - ~~performance.now()) + BigInt(~~data.timestamp);
         gamepad.latestData = packet;
+        gamepad.needsUpdate = true;
     }
 
     function bind(gamepads: globalThis.Gamepad[]) {
@@ -111,7 +111,7 @@
 
                 if (gamepad2.index === data.index) {
                     gamepad2.index = -1;
-                    if (gamepad2.latestData) gamepad2.latestData.timestamp = BigInt(Date.now());
+                    gamepad2.needsUpdate = true;
                 }
             } else if (data.buttons[1].pressed) {
                 gamepad2.index = data.index;
@@ -119,7 +119,7 @@
 
                 if (gamepad1.index === data.index) {
                     gamepad1.index = -1;
-                    if (gamepad1.latestData) gamepad1.latestData.timestamp = BigInt(Date.now());
+                    gamepad1.needsUpdate = true;
                 }
             }
         }

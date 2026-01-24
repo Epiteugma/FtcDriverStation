@@ -19,14 +19,14 @@ export const connection = $state({
     gamepad1: {
         index: -1,
         latestData: null,
-        lastSent: 0,
+        needsUpdate: false,
         bindLock: false,
     },
 
     gamepad2: {
         index: -1,
         latestData: null,
-        lastSent: 0,
+        needsUpdate: false,
         bindLock: false,
     },
 });
@@ -105,32 +105,32 @@ export function loop() {
 
     processQueuedCommands();
 
-    if (connection.gamepad1.latestData && connection.gamepad1.lastSent < Number(connection.gamepad1.latestData.timestamp)) {        
+    if (connection.gamepad1.latestData && connection.gamepad1.needsUpdate) {        
         if (connection.gamepad1.index === -1) {
             connection.gamepad1.latestData = new Gamepad();
-            connection.gamepad1.latestData.timestamp = BigInt(Date.now());
             connection.gamepad1.latestData.user = 1;
             connection.gamepad1.latestData.id = -2;
         }
         
         connection.gamepad1.latestData.seqNum = ++connection.seqNum;
-        window.robocol.sendPacket(connection.gamepad1.latestData.serialize().buffer, connection.remote);
+        connection.gamepad1.latestData.timestamp = BigInt(Date.now());
 
-        connection.gamepad1.lastSent = Date.now();
+        window.robocol.sendPacket(connection.gamepad1.latestData.serialize().buffer, connection.remote);
+        connection.gamepad1.needsUpdate = false;
     }
 
-    if (connection.gamepad2.latestData && connection.gamepad2.lastSent < Number(connection.gamepad2.latestData.timestamp)) {
+    if (connection.gamepad2.latestData && connection.gamepad2.needsUpdate) {
         if (connection.gamepad2.index === -1) {
             connection.gamepad2.latestData = new Gamepad();
-            connection.gamepad2.latestData.timestamp = BigInt(Date.now());
-            connection.gamepad2.latestData.user = 1;
+            connection.gamepad2.latestData.user = 2;
             connection.gamepad2.latestData.id = -2;
         }
 
         connection.gamepad2.latestData.seqNum = ++connection.seqNum;
-        window.robocol.sendPacket(connection.gamepad2.latestData.serialize().buffer, connection.remote);
+        connection.gamepad2.latestData.timestamp = BigInt(Date.now());
 
-        connection.gamepad2.lastSent = Date.now();
+        window.robocol.sendPacket(connection.gamepad2.latestData.serialize().buffer, connection.remote);
+        connection.gamepad2.needsUpdate = false;
     }
 }
 
