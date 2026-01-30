@@ -8,6 +8,7 @@ import Gamepad from '../librobocol/packets/gamepad';
 
 export const connection = $state({
     remote: null,
+    overridden: false,
     active: true,
 
     commandQueue: new Map<Command, number[]>(),
@@ -66,6 +67,7 @@ export enum Commands {
     RequestActiveConfig = 'CMD_REQUEST_ACTIVE_CONFIG',
     RequestUserDeviceTypes = 'CMD_REQUEST_USER_DEVICE_TYPES',
     RequestOpModeList = 'CMD_REQUEST_OP_MODE_LIST',
+    RestartRobot = 'CMD_RESTART_ROBOT',
 
     NotifyOpModeList = 'CMD_NOTIFY_OP_MODE_LIST',
     NotifyInitOpMode = 'CMD_NOTIFY_INIT_OP_MODE',
@@ -163,6 +165,7 @@ function processQueuedCommands() {
 
 function handle(packet: DeserializeResult, from: string) {
     if (packet instanceof PeerDiscovery && !connection.remote) {
+        connection.overridden = packet.peerType === PeerType.NotConnectedDueToPreexistingConnection;
         if (packet.peerType !== PeerType.Peer) return;
 
         connection.remote = from;

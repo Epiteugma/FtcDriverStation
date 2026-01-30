@@ -13,6 +13,7 @@ socket.on('message', (packet, from) => _onPacket(packet.buffer, from));
 let window: BrowserWindow;
 
 app.whenReady().then(init);
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
 function init() {
     window = new BrowserWindow({

@@ -19,14 +19,6 @@
         Configuration
     </button>
 
-    <button class={tab == 2 && 'active'} onclick={() => (tab = 2)}>
-        <svg style="background: #34aa8f" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960">
-            <path d="M320-240 80-480l240-240 57 57-184 184 183 183-56 56Zm320 0-57-57 184-184-183-183 56-56 240 240-240 240Z"/>
-        </svg>
-        
-        Program & Manage
-    </button>
-
     <span>
         by Team #13906 <br>
         Epiteugma Revved Up

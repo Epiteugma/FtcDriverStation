@@ -32,11 +32,11 @@
 <OpModeSelector opModes={robot.opModes} bind:selected />
 
 <div class="controls">
-    <button class="{robot.opModeState === OpModeState.Init ? 'run' : ''}" disabled={
+    <button class="{robot.opModeState === OpModeState.Init && robot.activeOpMode !== DEFAULT_OP_MODE_NAME ? 'run' : ''}" disabled={
         robot.opModes?.findIndex((o: any) => o.name === selected) < 0 || robot.state !== RobotState.Running || robot.opModeState !== OpModeState.Init && (robot.opModeState !== OpModeState.Looping || robot.activeOpMode !== DEFAULT_OP_MODE_NAME)
     } onclick={() => {
-        sendCommand(robot.opModeState == OpModeState.Looping ? Commands.InitOpMode : Commands.RunOpMode, selected);
-    }}>{robot.opModeState === OpModeState.Init ? 'Run' : 'Init'}</button>
+        sendCommand(robot.opModeState === OpModeState.Init && robot.activeOpMode !== DEFAULT_OP_MODE_NAME ? Commands.RunOpMode : Commands.InitOpMode, selected);
+    }}>{robot.opModeState === OpModeState.Init && robot.activeOpMode !== DEFAULT_OP_MODE_NAME ? 'Run' : 'Init'}</button>
 
     <button class="danger" disabled={
         robot.state !== RobotState.Running || (robot.opModeState !== OpModeState.Init && robot.opModeState !== OpModeState.Looping) || robot.activeOpMode === DEFAULT_OP_MODE_NAME

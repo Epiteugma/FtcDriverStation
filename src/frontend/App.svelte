@@ -3,15 +3,15 @@
     import Battery from './Battery.svelte';
     import Gamepads from './Gamepads.svelte';
     import Link from './Link.svelte';
+    import RestartRobot from './RestartRobot.svelte';
 
     import RobotControl from './tabs/RobotControl.svelte';
     import Configuration from './tabs/Configuration.svelte';
-    import ProgramManage from './tabs/ProgramManage.svelte';
 
     import { RobotState } from '../librobocol/types';
     import { connection, robot, loop, DEFAULT_OP_MODE_NAME, OpModeState } from '../util/robocol.svelte';
 
-    const tabs = [RobotControl, Configuration, ProgramManage];
+    const tabs = [RobotControl, Configuration];
 
     let tab = $state(0);
     let pad = $derived(tab < 2);
@@ -56,13 +56,18 @@
                     {/if}
                     {stringifyState(robot.state, robot.activeOpMode)}
                 {:else}
-                    Disconnected
+                    {#if connection.active && connection.overridden}
+                        <span style="color: var(--red)">Overridden</span>
+                    {:else}
+                        Disconnected
+                    {/if}
                 {/if}
             </span>
             <Battery bind:voltage={robot.batteryLevel} />
             <Gamepads bind:gamepad1={connection.gamepad1} bind:gamepad2={connection.gamepad2} />
         </div>
 
+        <RestartRobot height={20} width={20} style="margin-right: 20px" />
         <Link bind:on={connection.active} style="margin-right: 20px" />
 
         <!-- svelte-ignore a11y_click_events_have_key_events -->
