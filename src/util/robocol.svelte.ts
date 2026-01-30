@@ -82,9 +82,6 @@ export function loop() {
 
         robot.state = RobotState.Unknown;
         robot.batteryLevel = 0;
-
-        robot.opModes = [];
-        robot.activeOpMode = DEFAULT_OP_MODE_NAME;
         return;
     }
 
