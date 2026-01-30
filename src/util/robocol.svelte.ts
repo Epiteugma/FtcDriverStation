@@ -76,6 +76,8 @@ export enum Commands {
 }
 
 export function loop() {
+    requestAnimationFrame(loop);
+
     if (!connection.active || Date.now() - connection.lastHeartbeat > ASSUME_DISCONNECT_TIMER && !!connection.remote) {
         connection.remote = null;
         connection.seqNum = 0;

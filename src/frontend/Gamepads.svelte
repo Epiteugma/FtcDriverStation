@@ -84,19 +84,19 @@
         packet.rightStickX = cleanStickValue(data.axes[2]);
         packet.rightStickY = cleanStickValue(data.axes[3]);
 
-        if (!gamepad.start && (gamepad === gamepad1 && !gamepad.a || gamepad == gamepad2 && !gamepad.b)) {
+        if (!packet.start && (gamepad === gamepad1 && !packet.a || gamepad == gamepad2 && !packet.b)) {
             gamepad.bindLock = false;
         }
 
         if (gamepad.bindLock) {
-            gamepad.start = false;
+            packet.start = false;
 
-            if (gamepad === gamepad1) gamepad.a = false;
-            else gamepad.b = false;
+            if (gamepad === gamepad1) packet.a = false;
+            else packet.b = false;
         }
 
         gamepad.latestData = packet;
-        gamepad.needsUpdate = true;
+        gamepad.needsUpdate = (Date.now() - performance.now() + data.timestamp) + 10 > Number(gamepad.latestData.timestamp);
     }
 
     function bind(gamepads: globalThis.Gamepad[]) {

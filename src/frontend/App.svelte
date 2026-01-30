@@ -10,6 +10,7 @@
 
     import { RobotState } from '../librobocol/types';
     import { connection, robot, loop, DEFAULT_OP_MODE_NAME, OpModeState } from '../util/robocol.svelte';
+    import { onMount } from 'svelte';
 
     const tabs = [RobotControl, Configuration];
 
@@ -33,7 +34,7 @@
         return opMode;
     }
 
-    setInterval(loop);
+    onMount(() => loop());
 </script>
 
 <Navbar bind:tab />

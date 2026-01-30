@@ -13,7 +13,6 @@ socket.on('message', (packet, from) => _onPacket(packet.buffer, from));
 let window: BrowserWindow;
 
 app.whenReady().then(init);
-app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
 function init() {
     window = new BrowserWindow({
@@ -21,10 +20,11 @@ function init() {
         frame: false,
         webPreferences: {
             preload: join(app.getAppPath(), 'dist/preload.js'),
+            backgroundThrottling: false,
         },
     });
 
-    window.setMenu(null);
+    // window.setMenu(null);
     window.loadFile('assets/index.html');
 
     window.webContents.setWindowOpenHandler((details) => {
