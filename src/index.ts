@@ -19,12 +19,12 @@ function init() {
         resizable: false,
         frame: false,
         webPreferences: {
-            preload: join(app.getAppPath(), 'dist/preload.js'),
+            preload: join(app.getAppPath(), 'build/preload.js'),
             backgroundThrottling: false,
         },
     });
 
-    // window.setMenu(null);
+    window.setMenu(null);
     window.loadFile('assets/index.html');
 
     window.webContents.setWindowOpenHandler((details) => {
@@ -39,7 +39,7 @@ function init() {
                 width: 800,
                 height: 400,
                 webPreferences: {
-                    preload: join(app.getAppPath(), 'dist/preload.js'),
+                    preload: join(app.getAppPath(), 'build/preload.js'),
                 },
             }
         };

@@ -7,7 +7,7 @@ await build({
     external: ['electron'],
     platform: 'node',
     bundle: true,
-    outdir: 'dist'
+    outdir: 'build'
 });
 
 await build({
@@ -19,5 +19,5 @@ await build({
         '.jpg': 'dataurl',
     },
     bundle: true,
-    outdir: 'dist'
+    outdir: 'build'
 });

@@ -1,0 +1,17 @@
+{
+    "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+    "appId": "org.epiteugma.ftcpcdriverstation",
+    "productName": "FTC Driver Station",
+    "artifactName": "${name}-${os}-portable-${version}-${arch}.${ext}",
+    "files": ["build/**/*", "assets/**/*"],
+    "win": {
+        "target": "portable"
+    },
+    "linux": {
+        "target": "AppImage",
+        "category": "Utility"
+    },
+    "mac": {
+        "target": "dmg"
+    }
+}

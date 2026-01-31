@@ -1,7 +1,7 @@
 {
 	"name": "ftc-pc-ds",
 	"version": "1.0.0",
-	"main": "dist/index.js",
+	"main": "build/index.js",
 	"author": "",
 	"license": "MIT",
 	"scripts": {
@@ -11,6 +11,7 @@
 	"description": "",
 	"devDependencies": {
 		"electron": "^39.2.7",
+		"electron-builder": "^26.6.0",
 		"esbuild": "^0.27.2",
 		"esbuild-svelte": "^0.9.4",
 		"svelte": "^5.46.3",
