@@ -46,6 +46,9 @@ export const robot = $state({
     opModeState: OpModeState.Looping,
     activeOpMode: DEFAULT_OP_MODE_NAME,
 
+    configurations: [],
+    activeConfiguration: null,
+
     systemTelemetry: null,
     telemetry: null,
 });
@@ -53,6 +56,7 @@ export const robot = $state({
 export const TELEMETRY_SYSTEM_NONE_KEY = '$System$None$';
 export const TELEMETRY_SYSTEM_ERROR_KEY = '$System$Error$';
 export const TELEMETRY_SYSTEM_WARNING_KEY = '$System$Warning$';
+export const TELEMETRY_NUMBER_REGEX = /0*([0-9]+(?:\.[0-9]+)?)$/g;
 
 const BATTERY_LEVEL_KEY = '$Robot$Battery$Level$';
 const NO_VOLTAGE_SENSOR_KEY = '$no$voltage$sensor$';
