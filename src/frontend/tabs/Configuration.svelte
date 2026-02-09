@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { robot } from '../../util/robocol.svelte';
+    import { Commands, robot, sendCommand } from '../../util/robocol.svelte';
 
     let editing = $state(null);
 </script>
@@ -8,6 +8,7 @@
     <div>
         <input type="text" placeholder="name">
         <button>Save</button>
+        <button onclick={() => sendCommand(Commands.Scan)}>Scan</button>
         <button class="danger" onclick={() => (editing = null)}>Cancel</button>
     </div>
 
@@ -31,6 +32,13 @@
 {/if}
 
 <style>
+    input {
+        outline: none;
+        padding: 0 2px;
+        border: 1px solid #000;
+        border-radius: 5px;
+    }
+
     button {
         width: 75px;
         border-radius: 5px;

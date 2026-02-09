@@ -80,6 +80,9 @@ export enum Commands {
     RequestOpModeList = 'CMD_REQUEST_OP_MODE_LIST',
     RestartRobot = 'CMD_RESTART_ROBOT',
 
+    Scan = 'CMD_SCAN',
+    ScanResp = 'CMD_SCAN_RESP',
+
     NotifyActiveConfiguration = 'CMD_NOTIFY_ACTIVE_CONFIGURATION',
     NotifyOpModeList = 'CMD_NOTIFY_OP_MODE_LIST',
     NotifyInitOpMode = 'CMD_NOTIFY_INIT_OP_MODE',
