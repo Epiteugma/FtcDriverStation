@@ -1,6 +1,6 @@
 <script lang="ts">
     import OpModeSelector from '../OpModeSelector.svelte';
-    import { sendCommand, robot, DEFAULT_OP_MODE_NAME, Commands, TELEMETRY_SYSTEM_NONE_KEY, TELEMETRY_SYSTEM_WARNING_KEY, OpModeState } from '../../util/robocol.svelte';
+    import { sendCommand, robot, popouts, DEFAULT_OP_MODE_NAME, Commands, TELEMETRY_SYSTEM_NONE_KEY, TELEMETRY_SYSTEM_WARNING_KEY, OpModeState } from '../../util/robocol.svelte';
     import { RobotState } from '../../librobocol/types';
 
     let selected = $state('');
@@ -43,7 +43,18 @@
     } onclick={() => sendCommand(Commands.InitOpMode, DEFAULT_OP_MODE_NAME)}>Stop</button>
 </div>
 
-<h2>Telemetry</h2>
+<h2>
+    Telemetry
+
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <svg class="graphing" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" onclick={() => {
+        if (popouts.graphing && !popouts.graphing.closed) return;
+        popouts.graphing = window.open(window.location.href + '?graphing');
+    }}>
+        <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm406-80h85l69-69v-51h-34L606-200ZM306-400l121-120 80 80 203-204-56-56-147 147-80-80-177 177 56 56ZM200-200h34l120-120h-85l-69 69v51Zm341 0 120-120h-85L456-200h85Zm-149 0 120-120h-85L307-200h85Z"/>
+    </svg>
+</h2>
 
 <div class="telemetry">
     <pre><span
@@ -82,6 +93,18 @@
 
     h2 {
         margin-bottom: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .graphing {
+        height: 30px;
+        width: 30px;
+        margin-left: auto;
+        transition: .2s;
+    }
+    .graphing:hover {
+        fill: #04991c;
     }
 
     .telemetry {

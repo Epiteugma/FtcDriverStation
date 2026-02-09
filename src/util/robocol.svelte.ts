@@ -53,6 +53,11 @@ export const robot = $state({
     telemetry: null,
 });
 
+export const popouts = $state({
+    stackTrace: null,
+    graphing: null,
+});
+
 export const TELEMETRY_SYSTEM_NONE_KEY = '$System$None$';
 export const TELEMETRY_SYSTEM_ERROR_KEY = '$System$Error$';
 export const TELEMETRY_SYSTEM_WARNING_KEY = '$System$Warning$';
@@ -69,10 +74,13 @@ export enum Commands {
     RunOpMode = 'CMD_RUN_OP_MODE',
 
     RequestActiveConfig = 'CMD_REQUEST_ACTIVE_CONFIG',
+    RequestConfigurations = 'CMD_REQUEST_CONFIGURATIONS',
+    RequestConfigurationsResp = 'CMD_REQUEST_CONFIGURATIONS_RESP',
     RequestUserDeviceTypes = 'CMD_REQUEST_USER_DEVICE_TYPES',
     RequestOpModeList = 'CMD_REQUEST_OP_MODE_LIST',
     RestartRobot = 'CMD_RESTART_ROBOT',
 
+    NotifyActiveConfiguration = 'CMD_NOTIFY_ACTIVE_CONFIGURATION',
     NotifyOpModeList = 'CMD_NOTIFY_OP_MODE_LIST',
     NotifyInitOpMode = 'CMD_NOTIFY_INIT_OP_MODE',
     NotifyRunOpMode = 'CMD_NOTIFY_RUN_OP_MODE',
@@ -177,6 +185,7 @@ function handle(packet: DeserializeResult, from: string) {
         connection.lastHeartbeat = Date.now();
 
         sendCommand(Commands.RequestActiveConfig);
+        sendCommand(Commands.RequestConfigurations);
         sendCommand(Commands.RequestUserDeviceTypes);
         sendCommand(Commands.RequestOpModeList);
     }
@@ -241,10 +250,17 @@ function handleCommand(packet: Command) {
             robot.opModeState = OpModeState.Looping;
             break;
         case Commands.ShowStacktrace:
-            window.open(window.location.href + '?' + new URLSearchParams({
+            if (popouts.stackTrace && !popouts.stackTrace.closed) return;
+        
+            popouts.stackTrace = window.open(window.location.href + '?' + new URLSearchParams({
                 stackTrace: packet.extra
             }).toString());
-            
+            break;
+        case Commands.RequestConfigurationsResp:
+            robot.configurations = packet.extra;
+            break;
+        case Commands.NotifyActiveConfiguration:
+            robot.activeConfiguration = packet.extra;
             break;
     }
 }
