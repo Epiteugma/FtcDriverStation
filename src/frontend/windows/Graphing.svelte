@@ -27,16 +27,29 @@
     let lineWidth = 1;
     let points = $state([]);
 
+    let tooltip = $state({
+        point: 'hi',
+
+        element: null,
+        show: false,
+
+        x: 0,
+        y: 0,
+
+        alignRight: false,
+        alignTop: false,
+    });
+
     let graph: HTMLCanvasElement = $state(null);
     let ctx: CanvasRenderingContext2D = $state(null);
 
     onMount(() => {
         window.addEventListener('message', (event) => processTelemetry(event.data));
-
         window.addEventListener('resize', resize);
+        window.addEventListener('load', resize);
+
         ctx = graph.getContext('2d')!;
 
-        resize();
         draw();
 
         setInterval(() => {
@@ -134,6 +147,22 @@
                 ctx.strokeStyle = 'black';
             }
         }
+
+        if (tooltip.show && tooltip.point) drawTooltipLines(innerBounds);
+    }
+
+    function drawTooltipLines(innerBounds: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }) {
+        ctx.globalAlpha = 1;
+
+        console.log(graph.height);
+
+        ctx.fillRect(tooltip.x, innerBounds.y, lineWidth, innerBounds.height);
+        ctx.fillRect(innerBounds.x, tooltip.y, innerBounds.width, lineWidth);
     }
 
     function plot(point: {
@@ -197,6 +226,17 @@
     function markerStyle(i: number, isVertical = false) {
         ctx.globalAlpha = i % 2 == 0 ? 1 : 0.3;
     }
+
+    function mousemove(event: MouseEvent) {
+        let size = tooltip.element.getBoundingClientRect();
+
+        tooltip.show = true;
+        tooltip.x = event.offsetX;
+        tooltip.y = event.offsetY;
+
+        tooltip.alignRight = tooltip.x + size.width > graph.width;
+        tooltip.alignTop = tooltip.y - size.height < 0;
+    }
 </script>
 
 <div class="holder">
@@ -206,7 +246,14 @@
 
     <h1>Graphing</h1>
     
-    <div class="graph-holder">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="graph-holder" onmousemove={mousemove} onmouseleave={() => (tooltip.show = false)}>
+        <div
+            class="tooltip {tooltip.show && tooltip.point ? 'show' : ''} {tooltip.alignRight ? 'align-right' : ''} {tooltip.alignTop ? 'align-top' : ''}"
+            bind:this={tooltip.element} style="left: {tooltip.x}px; top: {tooltip.y}px"
+        >
+            Tooltip
+        </div>
         <canvas class="graph" bind:this={graph}></canvas>
     </div>
 </div>
@@ -222,6 +269,8 @@
     }
 
     .graph-holder {
+        position: relative;
+
         flex: 1;
         overflow: hidden;
     }
@@ -229,6 +278,31 @@
     .graph {
         width: 100%;
         height: 100%;
+    }
+
+    .tooltip {
+        position: absolute;
+        pointer-events: none;
+        transform: translateY(-100%);
+        padding: 10px;
+
+        visibility: hidden;
+    }
+
+    .tooltip.show {
+        visibility: visible;
+    }
+
+    .tooltip.align-top {
+        transform: none;
+    }
+
+    .tooltip.align-right {
+        transform: translate(-100%, -100%);
+    }
+
+    .tooltip.align-top.align-right {
+        transform: translateX(-100%);
     }
 
     h1 {
