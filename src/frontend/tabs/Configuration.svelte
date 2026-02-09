@@ -5,15 +5,59 @@
 </script>
 
 {#if editing}
+    <div>
+        <input type="text" placeholder="name">
+        <button>Save</button>
+        <button class="danger" onclick={() => (editing = null)}>Cancel</button>
+    </div>
+
     TODO
 {:else}
-    <button>New</button>
+    <button onclick={() => (editing = { isDirty: false, name: '' })}>New</button>
 
     {#each robot.configurations as config}
-        {config.name}
+        <div class="config">
+            {config.name}
 
-        <button>Activate</button>
-        <button>Edit</button>
-        <button>Delete</button>
+            <button class="green">Activate</button>
+            <button onclick={() => (editing = config)}>Edit</button>
+            <button class="danger">Delete</button>
+        </div>
     {/each}
+
+    {#if !robot.configurations.length}
+        No configurations found.
+    {/if}
 {/if}
+
+<style>
+    button {
+        width: 75px;
+        border-radius: 5px;
+        border: none;
+        outline: none;
+
+        background: var(--primary);
+        color: #fff;
+    }
+
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    button.green {
+        background: var(--green);
+        margin-left: 10px;
+    }
+
+    button.danger {
+        background: var(--red);
+    }
+
+    .config {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+</style>
