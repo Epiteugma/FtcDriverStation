@@ -26,6 +26,7 @@
 
     let lineWidth = 1;
     let points = $state([]);
+    let pointsB = $state([]);
 
     let tooltip = $state({
         point: 'hi',
@@ -56,6 +57,11 @@
             points.unshift({
                 time: Date.now(),
                 value: Math.sin(Date.now() % 30000 / 30000 * Math.PI * 2) * 12.5 + 12.5
+            });
+
+            pointsB.unshift({
+                time: Date.now(),
+                value: Math.sin(Date.now() % 30000 / 30000 * Math.PI * 2 - Math.PI) * 12.5 + 12.5
             });
         }, 200);
     });
@@ -132,19 +138,28 @@
             label(x, outerBounds.y + outerBounds.height, i, true);
         }
 
-        for (let i = 0; i < points.length; i++) {
-            if (!i) ctx.beginPath();
+        let pointSets = [
+            { color: 'blue', points },
+            { color: 'red', points: pointsB },
+        ];
 
-            let point = points[i % points.length];
-            plot(point, innerBounds, Math.floor(i / points.length));
+        for (let i = 0; i < pointSets.length; i++) {
+            let set = pointSets[i];
 
-            if (i == points.length - 1) {
-                ctx.strokeStyle = 'blue';
-                ctx.lineCap = 'round';
-                ctx.lineWidth = ctx.globalAlpha = 1;
-                ctx.stroke();
+            for (let j = 0; j < set.points.length; j++) {
+                if (!j) ctx.beginPath();
 
-                ctx.strokeStyle = 'black';
+                let point = set.points[j % points.length];
+                plot(point, innerBounds, Math.floor(j / set.points.length), set.color);
+
+                if (j == set.points.length - 1) {
+                    ctx.strokeStyle = set.color;
+                    ctx.lineCap = 'round';
+                    ctx.lineWidth = ctx.globalAlpha = 1;
+                    ctx.stroke();
+
+                    ctx.strokeStyle = 'black';
+                }
             }
         }
 
@@ -173,7 +188,7 @@
         y: number;
         width: number;
         height: number;
-    }, iteration: number) {
+    }, iteration: number, color: string) {
         let elapsed = (Date.now() - point.time) / 1000;
 
         let x = innerBounds.x + innerBounds.width - elapsed * square.width;
@@ -192,7 +207,7 @@
 
         // Draw individual points if on second iteration
 
-        ctx.fillStyle = ctx.strokeStyle = 'blue';
+        ctx.fillStyle = ctx.strokeStyle = color;
 
         ctx.beginPath();
         ctx.arc(x, y, 3, 0, Math.PI * 2);
