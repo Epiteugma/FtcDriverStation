@@ -3,7 +3,7 @@
     import { TELEMETRY_NUMBER_REGEX } from '../../util/robocol.svelte';
 
     let padding = {
-        left: 40,
+        left: 60,
         right: 0,
         top: 0,
         bottom: 10,
@@ -20,8 +20,8 @@
     };
 
     let scale = {
-        min: 0,
-        step: 1,
+        min: -1,
+        step: 0.1,
     };
 
     let lineWidth = 1;
@@ -56,12 +56,12 @@
         setInterval(() => {
             points.unshift({
                 time: Date.now(),
-                value: Math.sin(Date.now() % 30000 / 30000 * Math.PI * 2) * 12.5 + 12.5
+                value: Math.sin(Date.now() % 30000 / 30000 * Math.PI * 2)
             });
 
             pointsB.unshift({
                 time: Date.now(),
-                value: Math.sin(Date.now() % 30000 / 30000 * Math.PI * 2 - Math.PI) * 12.5 + 12.5
+                value: Math.sin(Date.now() % 30000 / 30000 * Math.PI * 2 - Math.PI)
             });
         }, 200);
     });
@@ -145,12 +145,13 @@
 
         for (let i = 0; i < pointSets.length; i++) {
             let set = pointSets[i];
+            let last: { x: number; y: number; };
 
             for (let j = 0; j < set.points.length; j++) {
                 if (!j) ctx.beginPath();
 
                 let point = set.points[j % points.length];
-                plot(point, innerBounds, Math.floor(j / set.points.length), set.color);
+                last = plot(point, last, innerBounds);
 
                 if (j == set.points.length - 1) {
                     ctx.strokeStyle = set.color;
@@ -174,8 +175,6 @@
     }) {
         ctx.globalAlpha = 1;
 
-        console.log(graph.height);
-
         ctx.fillRect(tooltip.x, innerBounds.y, lineWidth, innerBounds.height);
         ctx.fillRect(innerBounds.x, tooltip.y, innerBounds.width, lineWidth);
     }
@@ -183,43 +182,62 @@
     function plot(point: {
         time: number;
         value: number;
+    }, last: {
+        x: number;
+        y: number;
     }, innerBounds: {
         x: number;
         y: number;
         width: number;
         height: number;
-    }, iteration: number, color: string) {
+    }) {
         let elapsed = (Date.now() - point.time) / 1000;
 
         let x = innerBounds.x + innerBounds.width - elapsed * square.width;
         let y = innerBounds.y + innerBounds.height - (point.value - scale.min) / scale.step * square.height;
 
-        // TODO: handle points that are out of bounds (clamping)
-        if (
+        let oob = 
             innerBounds.x > x || x > innerBounds.x + innerBounds.width ||
             innerBounds.y > y || y > innerBounds.y + innerBounds.height
-        ) return;
+        ;
 
-        if (!iteration) {
-            ctx.lineTo(x, y);
-            return;
+        let lastOOB = last && (
+            innerBounds.x > last.x || last.x > innerBounds.x + innerBounds.width ||
+            innerBounds.y > last.y || last.y > innerBounds.y + innerBounds.height
+        );
+
+        if (
+            oob && last && !lastOOB ||
+            !oob && last && lastOOB
+        ) {
+            let dx = x - last.x;
+            let dy = y - last.y;
+
+            let tx1 = (innerBounds.x - last.x) / dx;
+            let ty1 = (innerBounds.y - last.y) / dy;
+            let tx2 = (innerBounds.x + innerBounds.width - last.x) / dx;
+            let ty2 = (innerBounds.y + innerBounds.height - last.y) / dy;
+
+            let tmin = Math.max(Math.min(tx1, tx2), Math.min(ty1, ty2));
+            let tmax = Math.min(Math.max(tx1, tx2), Math.max(ty1, ty2));
+
+            let ix = last.x + (oob ? tmax : tmin) * dx;
+            let iy = last.y + (oob ? tmax : tmin) * dy;
+
+            if (oob) {
+                ctx.lineTo(ix, iy);
+            } else {
+                ctx.moveTo(ix, iy);
+                ctx.lineTo(x, y);
+            }
+
+            return { x, y };
+        } else if (oob && !last || lastOOB) {
+            return { x, y };
         }
 
-        // Draw individual points if on second iteration
-
-        ctx.fillStyle = ctx.strokeStyle = color;
-
-        ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        ctx.closePath();
-
-        ctx.globalAlpha = 1;
-        ctx.stroke();
-
-        ctx.globalAlpha = 0.5;
-        ctx.fill();
-
-        ctx.fillStyle = ctx.strokeStyle = 'black';
+        ctx.lineTo(x, y);
+        return { x, y };
     }
 
     function label(x: number, y: number, i: number, isX = false) {
@@ -231,7 +249,9 @@
         ctx.textBaseline = 'middle';
         ctx.font = '14px Poppins';
 
-        ctx.fillText(i * scale.step + scale.min + '', x - 5, y + (isX ? 0 : 1));
+        let n = i * scale.step + scale.min;
+
+        ctx.fillText(n % 1 == 0 ? n + '' : n.toFixed(2), x - 5, y + (isX ? 0 : 1));
     }
 
     function lineStyle(i: number, isVertical = false) {

@@ -44,6 +44,7 @@ function init() {
                 height: isGraphing ? 600 : 400,
                 webPreferences: {
                     preload: join(app.getAppPath(), 'build/preload.js'),
+                    backgroundThrottling: !isGraphing,
                 },
             }
         };
