@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { TELEMETRY_NUMBER_REGEX } from '../../util/robocol.svelte';
+    import { TELEMETRY_NUMBER_REGEX as TELEMETRY_NUMBER_LINE_REGEX } from '../../util/robocol.svelte';
+    import type Telemetry from '../../librobocol/packets/telemetry';
 
     let padding = {
         left: 60,
@@ -25,9 +26,9 @@
     };
 
     let history = $state([
-        { key: 'sin t', enabled: true, color: '#ff0000', data: [] },
-        { key: 'cos t', enabled: true, color: '#0000ff', data: [] },
-        { key: 'tan t', enabled: true, color: '#00ff00', data: [] },
+        // { key: 'sin t', enabled: true, color: '#ff0000', data: [] },
+        // { key: 'cos t', enabled: true, color: '#0000ff', data: [] },
+        // { key: 'tan t', enabled: true, color: '#00ff00', data: [] },
     ]);
 
     let lineWidth = 1;
@@ -56,26 +57,79 @@
 
         draw();
 
-        setInterval(() => {
-            history[0].data.unshift({
-                time: Date.now(),
-                value: Math.sin(Date.now() % 10000 / 10000 * 2 * Math.PI)
-            });
+        // setInterval(() => {
+        //     history[0].data.unshift({
+        //         time: Date.now(),
+        //         value: Math.sin(Date.now() % 10000 / 10000 * 2 * Math.PI)
+        //     });
 
-            history[1].data.unshift({
-                time: Date.now(),
-                value: Math.cos(Date.now() % 10000 / 10000 * 2 * Math.PI)
-            });
+        //     history[1].data.unshift({
+        //         time: Date.now(),
+        //         value: Math.cos(Date.now() % 10000 / 10000 * 2 * Math.PI)
+        //     });
 
-            history[2].data.unshift({
-                time: Date.now(),
-                value: Math.tan(Date.now() % 10000 / 10000 * 2 * Math.PI)
-            });
-        }, 50);
+        //     history[2].data.unshift({
+        //         time: Date.now(),
+        //         value: Math.tan(Date.now() % 10000 / 10000 * 2 * Math.PI)
+        //     });
+        // }, 50);
     });
 
-    function processTelemetry(telemetry: any) {
+    function processTelemetry(telemetry: Telemetry) {
+        console.log(telemetry);
+        
+        let data: { [key: string]: number; } = {};
+        let time = Date.now();
 
+        for (let [key, value] of telemetry.dataStrings) {
+            if (key.startsWith('$') && key.endsWith('$')) continue;
+
+            let match = Array.from(value.matchAll(TELEMETRY_NUMBER_LINE_REGEX))?.[0];
+            if (!match) continue;
+
+            data[match[1]] = parseFloat(match[2]);
+        }
+
+        for (let [key, value] of telemetry.dataNumbers) {
+            data[key] = value;
+        }
+
+        for (let i = 0; i < history.length; i++) {
+            let set = history[i];
+
+            if (set.key in data) {
+                set.data.unshift({
+                    time,
+                    value: data[set.key],
+                });
+
+                delete data[set.key];
+            }
+
+            for (let j = 0; j < set.data.length; j++) {
+                let point = set.data[j];
+
+                if (time - point.time > 30e3) {
+                    set.data.splice(j, 1);
+                    j--;
+                    continue;
+                }
+            }
+
+            if (!set.data.length) {
+                history.splice(i, 1);
+                i--;
+            }
+        }
+
+        for (let key in data) {
+            history.push({
+                key,
+                enabled: false,
+                color: '#000000', // TODO: pretty defaults?
+                data: [{ time, value: data[key] }]
+            });
+        }
     }
 
     function updateScale(horizontalLines: number) {
