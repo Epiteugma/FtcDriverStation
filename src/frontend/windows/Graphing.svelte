@@ -24,13 +24,16 @@
         step: 0.1,
     };
 
+    let history = $state([
+        { key: 'sin t', enabled: true, color: '#ff0000', data: [] },
+        { key: 'cos t', enabled: true, color: '#0000ff', data: [] },
+        { key: 'tan t', enabled: true, color: '#00ff00', data: [] },
+    ]);
+
     let lineWidth = 1;
-    let points = $state([]);
-    let pointsB = $state([]);
 
     let tooltip = $state({
-        point: 'hi',
-
+        points: [],
         element: null,
         show: false,
 
@@ -54,20 +57,52 @@
         draw();
 
         setInterval(() => {
-            points.unshift({
+            history[0].data.unshift({
                 time: Date.now(),
-                value: Math.sin(Date.now() % 30000 / 30000 * Math.PI * 2)
+                value: Math.sin(Date.now() % 10000 / 10000 * 2 * Math.PI)
             });
 
-            pointsB.unshift({
+            history[1].data.unshift({
                 time: Date.now(),
-                value: Math.sin(Date.now() % 30000 / 30000 * Math.PI * 2 - Math.PI)
+                value: Math.cos(Date.now() % 10000 / 10000 * 2 * Math.PI)
             });
-        }, 200);
+
+            history[2].data.unshift({
+                time: Date.now(),
+                value: Math.tan(Date.now() % 10000 / 10000 * 2 * Math.PI)
+            });
+        }, 50);
     });
 
     function processTelemetry(telemetry: any) {
 
+    }
+
+    function updateScale(horizontalLines: number) {
+        let max = null;
+        let min = null;
+        
+        for (let i = 0; i < history.length; i++) {
+            let set = history[i];
+
+            if (!set.enabled) continue;
+
+            for (let j = 0; j < set.data.length; j++) {
+                let { value } = set.data[j];
+
+                if (max === null || value > max) max = value;
+                if (min === null || value < min) min = value;
+            }
+
+        }
+
+        let range = max - min;
+
+        min -= range * 0.05;
+        max += range * 0.05;
+
+        scale.min = min;
+        scale.step = range * 1.1 / horizontalLines;
     }
 
     function resize() {
@@ -97,6 +132,8 @@
 
         let horizontalLines = innerBounds.height / square.height;
         let verticalLines = innerBounds.width / square.width;
+
+        updateScale(horizontalLines);
 
         for (let i = 0; i < horizontalLines; i++) {
             let y = innerBounds.y + innerBounds.height - lineWidth - square.height * i;
@@ -138,22 +175,19 @@
             label(x, outerBounds.y + outerBounds.height, i, true);
         }
 
-        let pointSets = [
-            { color: 'blue', points },
-            { color: 'red', points: pointsB },
-        ];
-
-        for (let i = 0; i < pointSets.length; i++) {
-            let set = pointSets[i];
+        for (let i = 0; i < history.length; i++) {
+            let set = history[i];
             let last: { x: number; y: number; };
 
-            for (let j = 0; j < set.points.length; j++) {
+            if (!set.enabled) continue;
+
+            for (let j = 0; j < set.data.length; j++) {
                 if (!j) ctx.beginPath();
 
-                let point = set.points[j % points.length];
+                let point = set.data[j % set.data.length];
                 last = plot(point, last, innerBounds);
 
-                if (j == set.points.length - 1) {
+                if (j == set.data.length - 1) {
                     ctx.strokeStyle = set.color;
                     ctx.lineCap = 'round';
                     ctx.lineWidth = ctx.globalAlpha = 1;
@@ -164,7 +198,19 @@
             }
         }
 
-        if (tooltip.show && tooltip.point) drawTooltipLines(innerBounds);
+        if (tooltip.show) {
+            updateTooltipPoints(innerBounds);            
+            if (tooltip.points.length) drawTooltipLines(innerBounds);
+        }
+    }
+
+    function updateTooltipPoints(innerBounds: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }) {
+        
     }
 
     function drawTooltipLines(innerBounds: {
@@ -280,11 +326,23 @@
     <div class="close" onclick={() => window.close()}></div>
 
     <h1>Graphing</h1>
+
+    <span>Select keys to graph below.</span>
+
+    <div class="keys">
+        {#each history as set}
+            <div class="key">
+                <input type="checkbox" bind:checked={set.enabled}>
+                <input type="color" bind:value={set.color}>
+                <span>{set.key}</span>
+            </div>
+        {/each}
+    </div>
     
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="graph-holder" onmousemove={mousemove} onmouseleave={() => (tooltip.show = false)}>
         <div
-            class="tooltip {tooltip.show && tooltip.point ? 'show' : ''} {tooltip.alignRight ? 'align-right' : ''} {tooltip.alignTop ? 'align-top' : ''}"
+            class="tooltip {tooltip.show && tooltip.points.length ? 'show' : ''} {tooltip.alignRight ? 'align-right' : ''} {tooltip.alignTop ? 'align-top' : ''}"
             bind:this={tooltip.element} style="left: {tooltip.x}px; top: {tooltip.y}px"
         >
             Tooltip
@@ -345,8 +403,7 @@
         width: calc(100% - 20px);
         
         margin: 0;
-        margin-bottom: 15px;
-        padding-left: 5px;
+        margin-bottom: 10px;
     }
 
     .close {
@@ -386,5 +443,46 @@
     .close::after {
         width: 100%;
         height: 4px;
+    }
+
+    .keys {
+        display: flex;
+        flex-direction: column;
+        flex-wrap: wrap;
+        overflow: auto;
+        max-height: 200px;
+        gap: 10px;
+        margin: 10px 0;
+    }
+
+    .key {
+        display: flex;
+        align-items: center;
+    }
+
+    .key > span {
+        margin-left: 5px;
+    }
+
+    .key input[type=checkbox] {
+        width: 14px;
+        height: 14px;
+        border-radius: 5px;
+    }
+
+    .key input[type=color] {
+        appearance: none;
+        padding: 0;
+        border-radius: 50%;
+        width: 14px;
+        height: 14px;
+    }
+
+    .key input[type=color]::-webkit-color-swatch-wrapper {
+        padding: 0;
+    }
+
+    .key input[type=color]::-webkit-color-swatch {
+        border: none;
     }
 </style>

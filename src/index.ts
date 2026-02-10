@@ -12,6 +12,7 @@ socket.on('message', (packet, from) => _onPacket(packet.buffer, from));
 
 let window: BrowserWindow;
 
+app.setName('FTC Driver Station Desktop [by #13906]');
 app.whenReady().then(init);
 
 function init() {

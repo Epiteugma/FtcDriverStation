@@ -83,6 +83,9 @@ export enum Commands {
     Scan = 'CMD_SCAN',
     ScanResp = 'CMD_SCAN_RESP',
 
+    ActivateConfig = 'CMD_ACTIVATE_CONFIGURATION',
+    DeleteConfig = 'CMD_DELETE_CONFIGURATION',
+
     NotifyActiveConfiguration = 'CMD_NOTIFY_ACTIVE_CONFIGURATION',
     NotifyOpModeList = 'CMD_NOTIFY_OP_MODE_LIST',
     NotifyInitOpMode = 'CMD_NOTIFY_INIT_OP_MODE',

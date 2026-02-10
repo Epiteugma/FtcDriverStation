@@ -16,13 +16,18 @@
 {:else}
     <button onclick={() => (editing = { isDirty: false, name: '' })}>New</button>
 
-    {#each robot.configurations as config}
+    {#each robot.configurations as config, i}
         <div class="config">
             {config.name}
 
-            <button class="green">Activate</button>
+            <button class="green" onclick={() => sendCommand(Commands.ActivateConfig, config)}>Activate</button>
             <button onclick={() => (editing = config)}>Edit</button>
-            <button class="danger">Delete</button>
+            <button class="danger" onclick={() => {
+                if (!confirm('Are you sure that you want to delete ' + config.name + '?')) return;
+
+                sendCommand(Commands.DeleteConfig, config);
+                robot.configurations.splice(i, 1);
+            }}>Delete</button>
         </div>
     {/each}
 
