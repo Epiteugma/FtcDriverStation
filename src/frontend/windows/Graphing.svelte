@@ -30,10 +30,7 @@
         time: 500,
     };
 
-    let datasets = $state([
-        { key: 'sin t', enabled: true, color: '#ff0000', data: [] },
-        { key: 'cos t', enabled: true, color: '#0000ff', data: [] },
-    ]);
+    let datasets = $state([]);
 
     let pausedTime = $state(null);
     let lineWidth = 1;
@@ -61,18 +58,6 @@
 
         ctx = graph.getContext('2d')!;
         draw();
-
-        setInterval(() => {
-            datasets[0].data.unshift({
-                time: Date.now(),
-                value: Math.sin(Date.now() % 10000 / 10000 * 2 * Math.PI)
-            });
-
-            datasets[1].data.unshift({
-                time: Date.now(),
-                value: Math.cos(Date.now() % 10000 / 10000 * 2 * Math.PI)
-            });
-        }, 50);
     });
 
     function processTelemetry(telemetry: Telemetry) {        
