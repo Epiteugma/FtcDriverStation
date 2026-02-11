@@ -30,7 +30,10 @@
         time: 500,
     };
 
-    let datasets = $state([]);
+    let datasets = $state([
+        { key: 'sin t', enabled: true, color: '#ff0000', data: [] },
+        { key: 'cos t', enabled: true, color: '#0000ff', data: [] },
+    ]);
 
     let pausedTime = $state(null);
     let lineWidth = 1;
@@ -58,6 +61,18 @@
 
         ctx = graph.getContext('2d')!;
         draw();
+
+        setInterval(() => {
+            datasets[0].data.unshift({
+                time: Date.now(),
+                value: Math.sin(Date.now() % 10000 / 10000 * 2 * Math.PI)
+            });
+
+            datasets[1].data.unshift({
+                time: Date.now(),
+                value: Math.cos(Date.now() % 10000 / 10000 * 2 * Math.PI)
+            });
+        }, 50);
     });
 
     function processTelemetry(telemetry: Telemetry) {        
@@ -436,6 +451,71 @@
         ctx.globalAlpha = i % 2 == 0 ? 1 : 0.3;
     }
 
+    function exportDatasets() {
+        if (!hasData()) return;
+
+        let rows = [['timestamp']];
+        let timestamped = {};
+        let timestamps = [];
+
+        for (let i = 0; i < datasets.length; i++) {
+            let set = datasets[i];
+            rows[0].push(set.key);
+
+            for (let j = 0; j < set.data.length; j++) {
+                let point = set.data[j];
+                
+                if (!(point.time in timestamped)) {
+                    timestamped[point.time] = {};
+                    timestamps.push(point.time);
+                }
+                
+                timestamped[point.time][i] = point.value;
+            }
+        }
+
+        timestamps.sort((a, b) => a - b);
+
+        for (let i = 0; i < timestamps.length; i++) {
+            let time = timestamps[i];
+            let data = timestamped[time];
+
+            let row = [time];
+
+            for (let j = 0; j < datasets.length; j++) {
+                if (!(j in data)) row.push('');
+                else row.push(data[j]);
+            }
+
+            rows.push(row);
+        }
+
+        let csv = '';
+
+        for (let i = 0; i < rows.length; i++) {
+            csv += rows[i].join(',') + '\n';
+        }
+
+        csv = csv.trim();
+
+        let a = document.createElement('a');
+        a.download = 'telemetry.csv';
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        
+        a.click();
+        a.remove();
+    }
+
+    function hasData() {
+        if (!datasets.length) return false;
+
+        for (let i = 0; i < datasets.length; i++) {
+            if (datasets[i].data.length) return true;
+        }
+
+        return false;
+    }
+
     function mousemove(event: MouseEvent) {
         let size = tooltip.element.getBoundingClientRect();
 
@@ -479,7 +559,12 @@
         </svg>
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <svg class="clear" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" onclick={() => {
+        <svg class="export {hasData() ? '' : 'disabled'}" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" onclick={exportDatasets}>
+            <path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/>
+        </svg>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <svg class="clear {hasData() ? '' : 'disabled'}" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" onclick={() => {
             for (let i = 0; i < datasets.length; i++) datasets[i].data = [];
             tooltip.points = [];
         }}>
@@ -543,6 +628,11 @@
 
     .controls-holder .clear {
         background: var(--red);
+    }
+
+    .controls-holder .disabled {
+        opacity: .5;
+        cursor: not-allowed;
     }
 
     .graph-holder {

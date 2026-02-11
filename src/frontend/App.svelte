@@ -9,7 +9,7 @@
     import Configuration from './tabs/Configuration.svelte';
 
     import { RobotState } from '../librobocol/types';
-    import { connection, robot, loop, DEFAULT_OP_MODE_NAME, OpModeState } from '../util/robocol.svelte';
+    import { connection, robot, popouts, loop, DEFAULT_OP_MODE_NAME, OpModeState } from '../util/robocol.svelte';
     import { onMount } from 'svelte';
 
     const tabs = [RobotControl, Configuration];
@@ -36,6 +36,13 @@
 
     onMount(() => loop());
 </script>
+
+<svelte:window onbeforeunload={(event) => {
+    if (popouts.stackTrace && !popouts.stackTrace.closed) popouts.stackTrace.close();
+    if (popouts.graphing && !popouts.graphing.closed) popouts.graphing.close();
+
+    return null;
+}} />
 
 <Navbar bind:tab />
 
