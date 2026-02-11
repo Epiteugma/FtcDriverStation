@@ -14,7 +14,10 @@
 
     TODO
 {:else}
-    <button onclick={() => (editing = { isDirty: false, name: '' })}>New</button>
+    <div>
+        <button onclick={() => (editing = { isDirty: false, name: '' })}>New</button>
+        <span style="margin-left: 10px">Active configuration: {robot.activeConfiguration || '<None>'}</span>
+    </div>
 
     {#each robot.configurations as config, i}
         <div class="config">
