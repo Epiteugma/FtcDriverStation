@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { TELEMETRY_NUMBER_REGEX as TELEMETRY_NUMBER_LINE_REGEX } from '../../util/robocol.svelte';
-    import type Telemetry from '../../librobocol/packets/telemetry';
+    import Telemetry from '../../librobocol/packets/telemetry';
 
     const HISTORY_TIME = 60e3;
     const DEFAULT_SET_COLORS = ['#0000ff', '#dc143c', '#008000', '#ffa500', '#4b0082', '#1e90ff'];
@@ -53,11 +53,61 @@
 
     onMount(() => {
         window.addEventListener('message', (event) => processTelemetry(event.data));
-        window.addEventListener('resize', resize);
-        window.addEventListener('load', resize);
+        new ResizeObserver(resize).observe(graph);
 
         ctx = graph.getContext('2d')!;
         draw();
+    });
+
+    // DEBUG
+    (() => {
+        function fakeKey() {
+            let alphabet = 'abcdefghijklmnopqrstuvwxyz';
+            let key = '';
+
+            for (let i = 0; i < 36; i++) {
+                let rand = ~~(Math.random() * alphabet.length * 2);
+                let char = alphabet[rand % alphabet.length];
+
+                if (rand >= alphabet.length) char = char.toUpperCase();
+                key += char;
+            }
+
+            return key;
+        }
+
+        function *fakeValidKey() {
+            while (true) {
+                let keys = [];
+
+                for (let i = 0; i < 10; i++) {
+                    keys.push(fakeKey());
+                    yield keys[i];
+                }
+
+                let i = 0;
+
+                while (i < keys.length * 150) {
+                    yield keys[i % keys.length];
+                    i++;
+                }
+            }
+        }
+
+        const validGen = fakeValidKey();
+
+        function debug() {
+            const fakeTelem = new Telemetry();
+
+            for (let i = 0; i < 20; i++) {
+                if (i >= 10) fakeTelem.dataStrings.set(~~(Math.random() * 255) + '', fakeKey() + ' : ' + fakeKey());
+                else fakeTelem.dataStrings.set(~~(Math.random() * 255) + '', validGen.next().value + ' : ' + (Math.random() * 100).toFixed(4));
+            }
+
+            processTelemetry(fakeTelem);
+        }
+
+        setInterval(debug, 200);
     });
 
     function processTelemetry(telemetry: Telemetry) {        
@@ -112,6 +162,17 @@
                 color: DEFAULT_SET_COLORS[datasets.length % DEFAULT_SET_COLORS.length],
                 data: [{ time, value: data[key] }]
             });
+        }
+
+        for (let i = 0; i < tooltip.points.length; i++) {
+            let point = tooltip.points[i];
+            let set = datasets[point.set];
+
+            if (!set || !set.data[point.index]) {
+                tooltip.points.splice(i, 1);
+                i--;
+                continue;
+            }
         }
     }
 
@@ -238,7 +299,7 @@
         }
 
         if (tooltip.show) {
-            updateTooltipPoints(innerBounds);     
+            updateTooltipPoints(innerBounds);
 
             if (tooltip.points.length) {
                 drawTooltipLines(innerBounds);
