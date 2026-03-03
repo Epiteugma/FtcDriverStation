@@ -42,12 +42,7 @@ export const robot = $state({
     batteryLevel: 0,
     state: RobotState.Unknown,
 
-    opModes: [
-        { flavor: 'TELEOP', name: 'TeleOp Red', group: '' },
-        { flavor: 'TELEOP', name: 'TeleOp Blue', group: '' },
-        { flavor: 'AUTONOMOUS', name: 'Auto Red', group: '' },
-        { flavor: 'AUTONOMOUS', name: 'Auto Blue', group: '' },
-    ],
+    opModes: [],
     opModeState: OpModeState.Looping,
     activeOpMode: DEFAULT_OP_MODE_NAME,
 
