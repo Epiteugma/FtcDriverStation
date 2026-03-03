@@ -1,9 +1,9 @@
 <script lang="ts">
     import OpModeSelector from '../OpModeSelector.svelte';
-    import { sendCommand, robot, popouts, DEFAULT_OP_MODE_NAME, Commands, TELEMETRY_SYSTEM_NONE_KEY, TELEMETRY_SYSTEM_WARNING_KEY, OpModeState } from '../../util/robocol.svelte';
+    import OpModePreselect from '../OpModePreselect.svelte';
+    import Slider from '../Slider.svelte';
+    import { sendCommand, robot, robotControl, popouts, DEFAULT_OP_MODE_NAME, Commands, TELEMETRY_SYSTEM_NONE_KEY, TELEMETRY_SYSTEM_WARNING_KEY, OpModeState } from '../../util/robocol.svelte';
     import { RobotState } from '../../librobocol/types';
-
-    let selected = $state('');
 
     let systemTelemetry = $derived.by(() => {
         if (!robot.systemTelemetry || robot.systemTelemetry.tag === TELEMETRY_SYSTEM_NONE_KEY) return '';
@@ -27,21 +27,61 @@
 
         return out;
     });
+
+    $effect(() => {
+        console.log('effect ran');
+
+        let selectedOpMode = robot.opModes.find(o => o.name === robotControl.selectedOpMode);
+        if (!selectedOpMode || selectedOpMode.flavor !== 'AUTONOMOUS') robotControl.queuedOpMode = '';
+    });
 </script>
 
-<OpModeSelector opModes={robot.opModes} bind:selected />
+<OpModeSelector opModes={robot.opModes} bind:selected={robotControl.selectedOpMode} />
 
 <div class="controls">
     <button class="{robot.opModeState === OpModeState.Init && robot.activeOpMode !== DEFAULT_OP_MODE_NAME ? 'run' : ''}" disabled={
-        robot.opModes?.findIndex((o: any) => o.name === selected) < 0 || robot.state !== RobotState.Running || robot.opModeState !== OpModeState.Init && (robot.opModeState !== OpModeState.Looping || robot.activeOpMode !== DEFAULT_OP_MODE_NAME)
+        robot.opModes.findIndex((o: any) => o.name === robotControl.selectedOpMode) < 0 || robot.state !== RobotState.Running || robot.opModeState !== OpModeState.Init && (robot.opModeState !== OpModeState.Looping || robot.activeOpMode !== DEFAULT_OP_MODE_NAME)
     } onclick={() => {
-        sendCommand(robot.opModeState === OpModeState.Init && robot.activeOpMode !== DEFAULT_OP_MODE_NAME ? Commands.RunOpMode : Commands.InitOpMode, selected);
+        sendCommand(robot.opModeState === OpModeState.Init && robot.activeOpMode !== DEFAULT_OP_MODE_NAME ? Commands.RunOpMode : Commands.InitOpMode, robotControl.selectedOpMode);
     }}>{robot.opModeState === OpModeState.Init && robot.activeOpMode !== DEFAULT_OP_MODE_NAME ? 'Run' : 'Init'}</button>
 
     <button class="danger" disabled={
         robot.state !== RobotState.Running || (robot.opModeState !== OpModeState.Init && robot.opModeState !== OpModeState.Looping) || robot.activeOpMode === DEFAULT_OP_MODE_NAME
     } onclick={() => sendCommand(Commands.InitOpMode, DEFAULT_OP_MODE_NAME)}>Stop</button>
+
+    <OpModePreselect disabled={(() => {
+        let selectedOpMode = robot.opModes.find(o => o.name === robotControl.selectedOpMode);
+        return !selectedOpMode || selectedOpMode.flavor !== 'AUTONOMOUS';
+    })()} opModes={robot.opModes} bind:selected={robotControl.queuedOpMode} />
+
+    {#if robotControl.queuedOpMode}
+        Up next: {robotControl.queuedOpMode}
+    {:else}&nbsp;{/if}
 </div>
+
+<div class="sep"></div>
+
+<div class="timer-holder">
+    <h2 class="timer" style="width:150px">{robotControl.timer.formatted}</h2>
+    <div class="timer-controls">
+        <div>
+            <Slider bind:value={robotControl.timer.useAuto} />
+            Use timer for autonomous
+        </div>
+        
+        <div>
+            <Slider bind:value={robotControl.timer.useTeleOp} />
+            Use timer for TeleOp
+        </div>
+
+        <div>
+            <Slider bind:value={robotControl.timer.initTeleOp} />
+            Init & run TeleOp after autonomous
+        </div>
+    </div>
+</div>
+
+<div class="sep"></div>
 
 <h2>
     Telemetry
@@ -70,6 +110,7 @@
 
     button {
         width: 75px;
+        height: 22px;
         border-radius: 5px;
         border: none;
         outline: none;
@@ -92,7 +133,7 @@
     }
 
     h2 {
-        margin-bottom: 0;
+        margin: 0;
         display: flex;
         align-items: center;
     }
@@ -147,5 +188,34 @@
     pre::-webkit-scrollbar-thumb {
         box-shadow: inset 0 0 1px #000;
         backdrop-filter: blur(5px);
+    }
+
+    .sep {
+        width: 100%;
+        height: 1px;
+        background: #ccc;
+    }
+
+    .timer {
+        font-size: 50px;
+        padding: 0 20px;
+        margin: 0;
+    }
+
+    .timer-holder {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .timer-controls {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .timer-controls > div {
+        display: flex;
+        align-items: center;
+        gap: 5px;
     }
 </style>

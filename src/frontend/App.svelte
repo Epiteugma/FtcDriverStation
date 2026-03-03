@@ -62,7 +62,7 @@
                             </svg>
                         {/if}
                     {/if}
-                    {stringifyState(robot.state, robot.activeOpMode)}
+                    <span class="text">{stringifyState(robot.state, robot.activeOpMode)}</span>
                 {:else}
                     {#if connection.active && connection.overridden}
                         <span style="color: var(--red)">Overridden</span>
@@ -121,6 +121,12 @@
         justify-content: center;
         text-align: center;
         gap: 5px;
+    }
+
+    .robot-state .text {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
     }
 
     .robot-state svg {

@@ -42,7 +42,12 @@ export const robot = $state({
     batteryLevel: 0,
     state: RobotState.Unknown,
 
-    opModes: null,
+    opModes: [
+        { flavor: 'TELEOP', name: 'TeleOp Red', group: '' },
+        { flavor: 'TELEOP', name: 'TeleOp Blue', group: '' },
+        { flavor: 'AUTONOMOUS', name: 'Auto Red', group: '' },
+        { flavor: 'AUTONOMOUS', name: 'Auto Blue', group: '' },
+    ],
     opModeState: OpModeState.Looping,
     activeOpMode: DEFAULT_OP_MODE_NAME,
 
@@ -51,6 +56,21 @@ export const robot = $state({
 
     systemTelemetry: null,
     telemetry: null,
+});
+
+export const robotControl = $state({
+    selectedOpMode: '',
+    queuedOpMode: '',
+
+    timer: {
+        useAuto: false,
+        useTeleOp: false,
+        initTeleOp: false,
+
+        start: null,
+        time: 0,
+        formatted: '0:00',
+    },
 });
 
 export const popouts = $state({
@@ -93,8 +113,59 @@ export enum Commands {
     ShowStacktrace = 'CMD_SHOW_STACKTRACE',
 }
 
+function onTimerEnd() {
+    let runningOpMode = robot.opModes.find(o => o.name === robot.activeOpMode);
+    if (runningOpMode.flavor === 'SYSTEM') return;
+
+    robotControl.timer.start = null;
+
+    switch (runningOpMode.flavor) {
+        case 'TELEOP':
+            if (robotControl.timer.time === 120 && robot.opModeState === OpModeState.Looping) {
+                sendCommand(Commands.InitOpMode, DEFAULT_OP_MODE_NAME);
+            } else if (robotControl.timer.time === 8 && robot.opModeState === OpModeState.Init) {
+                sendCommand(Commands.RunOpMode, robot.activeOpMode);
+            }
+
+            break;
+        case 'AUTONOMOUS':
+            if (robot.opModeState !== OpModeState.Looping) return;
+            robotControl.selectedOpMode = robotControl.queuedOpMode || robotControl.selectedOpMode;
+
+            if (robotControl.timer.initTeleOp) {
+                robotControl.timer.time = 8;
+                robotControl.timer.start = Date.now();
+            }
+
+            sendCommand(Commands.InitOpMode, robotControl.timer.initTeleOp ? robotControl.selectedOpMode : DEFAULT_OP_MODE_NAME);
+            break;
+    }
+}
+
+function tickTimer() {
+    let selectedOpMode = robot.opModes.find(o => o.name === robotControl.selectedOpMode);
+    let queuedOpMode = robot.opModes.find(o => o.name === robotControl.queuedOpMode);
+
+    let time: number;
+
+    if (!robotControl.timer.start) {
+        robotControl.timer.time = time = (robotControl.timer.useAuto && selectedOpMode && selectedOpMode.flavor === 'AUTONOMOUS' ? 30 : 0) + (robotControl.timer.useTeleOp && (queuedOpMode || selectedOpMode && selectedOpMode.flavor === 'TELEOP') ? 120 : 0);
+    } else {
+        let elapsed = (Date.now() - robotControl.timer.start) / 1e3;
+        time = robotControl.timer.time - elapsed;
+
+        if (time <= 0) {
+            time = 0;
+            onTimerEnd();
+        }
+    }
+
+    robotControl.timer.formatted = (~~(time / 60) + '').padStart(2, '0') + ':' + (time % 60 + '').padStart(2, '0');
+}
+
 export function loop() {
     requestAnimationFrame(loop);
+    tickTimer();
 
     if (!connection.active || Date.now() - connection.lastHeartbeat > ASSUME_DISCONNECT_TIMER && !!connection.remote) {
         connection.remote = null;
@@ -258,6 +329,14 @@ function handleCommand(packet: Command) {
         case Commands.NotifyRunOpMode:
             robot.activeOpMode = packet.extra;
             robot.opModeState = OpModeState.Looping;
+
+            let opMode = robot.opModes.find(o => o.name === robot.activeOpMode);
+
+            if (
+                opMode.flavor === 'TELEOP' && robotControl.timer.useAuto ||
+                opMode.flavor === 'AUTONOMOUS' && robotControl.timer.useTeleOp
+            ) robotControl.timer.start = Date.now();
+            
             break;
         case Commands.ShowStacktrace:
             if (popouts.stackTrace && !popouts.stackTrace.closed) return;

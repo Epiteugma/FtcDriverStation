@@ -1,5 +1,5 @@
 <script lang="ts">
-    let { opModes = null, selected = $bindable('') } = $props();
+    let { opModes = [], selected = $bindable('') } = $props();
 
     let sortedOpModes = $derived(opModes ? Array.from(opModes).sort(sortOpModes) : null);
 
@@ -15,7 +15,7 @@
     <div class="selector-holder">
         <div class="selector">
             <select bind:value={selected}>
-                {#if !opModes || !autoOpModes.length}
+                {#if !autoOpModes.length}
                     <option disabled>No OpModes found</option>
                 {:else}
                     {#each autoOpModes as opMode}
@@ -33,7 +33,7 @@
 
         <div class="selector">
             <select bind:value={selected}>
-                {#if !opModes || !teleOpModes.length}
+                {#if !teleOpModes.length}
                     <option disabled>No OpModes found</option>
                 {:else}
                     {#each teleOpModes as opMode}
