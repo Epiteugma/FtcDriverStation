@@ -29,8 +29,6 @@
     });
 
     $effect(() => {
-        console.log('effect ran');
-
         let selectedOpMode = robot.opModes.find(o => o.name === robotControl.selectedOpMode);
         if (!selectedOpMode || selectedOpMode.flavor !== 'AUTONOMOUS') robotControl.queuedOpMode = '';
     });
@@ -62,7 +60,7 @@
 <div class="sep"></div>
 
 <div class="timer-holder">
-    <h2 class="timer" style="width:150px">{robotControl.timer.formatted}</h2>
+    <h2 class="timer" style="width:120px">{robotControl.timer.formatted}</h2>
     <div class="timer-controls">
         <div>
             <Slider bind:value={robotControl.timer.useAuto} />

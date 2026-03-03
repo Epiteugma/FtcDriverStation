@@ -130,14 +130,17 @@ function onTimerEnd() {
             break;
         case 'AUTONOMOUS':
             if (robot.opModeState !== OpModeState.Looping) return;
-            robotControl.selectedOpMode = robotControl.queuedOpMode || robotControl.selectedOpMode;
 
-            if (robotControl.timer.initTeleOp) {
+            if (robotControl.timer.initTeleOp && robotControl.queuedOpMode) {
                 robotControl.timer.time = 8;
                 robotControl.timer.start = Date.now();
+
+                robotControl.selectedOpMode = robotControl.queuedOpMode;
+                sendCommand(Commands.InitOpMode, robotControl.selectedOpMode);
+            } else {
+                sendCommand(Commands.InitOpMode, DEFAULT_OP_MODE_NAME);
             }
 
-            sendCommand(Commands.InitOpMode, robotControl.timer.initTeleOp ? robotControl.selectedOpMode : DEFAULT_OP_MODE_NAME);
             break;
     }
 }
@@ -149,7 +152,7 @@ function tickTimer() {
     let time: number;
 
     if (!robotControl.timer.start) {
-        robotControl.timer.time = time = (robotControl.timer.useAuto && selectedOpMode && selectedOpMode.flavor === 'AUTONOMOUS' ? 30 : 0) + (robotControl.timer.useTeleOp && (queuedOpMode || selectedOpMode && selectedOpMode.flavor === 'TELEOP') ? 120 : 0);
+        robotControl.timer.time = time = robotControl.timer.useAuto && selectedOpMode && selectedOpMode.flavor === 'AUTONOMOUS' ? 30 : robotControl.timer.useTeleOp && selectedOpMode && selectedOpMode.flavor === 'TELEOP' ? 120 : 0;
     } else {
         let elapsed = (Date.now() - robotControl.timer.start) / 1e3;
         time = robotControl.timer.time - elapsed;
@@ -158,9 +161,12 @@ function tickTimer() {
             time = 0;
             onTimerEnd();
         }
+
+        time++;
     }
 
-    robotControl.timer.formatted = (~~(time / 60) + '').padStart(2, '0') + ':' + (time % 60 + '').padStart(2, '0');
+    time += robotControl.timer.useTeleOp && queuedOpMode ? 120 : 0;
+    robotControl.timer.formatted = ~~(time / 60) + ':' + (~~(time % 60) + '').padStart(2, '0');
 }
 
 export function loop() {
@@ -325,6 +331,11 @@ function handleCommand(packet: Command) {
         case Commands.NotifyInitOpMode:
             robot.activeOpMode = packet.extra;
             robot.opModeState = OpModeState.Init;
+
+            if (robot.activeOpMode === DEFAULT_OP_MODE_NAME) {
+                robotControl.timer.start = null;
+            }
+
             break;
         case Commands.NotifyRunOpMode:
             robot.activeOpMode = packet.extra;
@@ -333,8 +344,8 @@ function handleCommand(packet: Command) {
             let opMode = robot.opModes.find(o => o.name === robot.activeOpMode);
 
             if (
-                opMode.flavor === 'TELEOP' && robotControl.timer.useAuto ||
-                opMode.flavor === 'AUTONOMOUS' && robotControl.timer.useTeleOp
+                opMode.flavor === 'AUTONOMOUS' && robotControl.timer.useAuto ||
+                opMode.flavor === 'TELEOP' && robotControl.timer.useTeleOp
             ) robotControl.timer.start = Date.now();
             
             break;
