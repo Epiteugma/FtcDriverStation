@@ -6,12 +6,13 @@
     --primary: #6030fe;
 }
 
- @keyframes gamepad-glow {
+@keyframes gamepad-glow {
     from {
-        filter: drop-shadow(0 0 2px lime);
+        stroke: var(--green);
+        stroke-opacity: 1;
     }
 
     to {
-        filter: drop-shadow(0 0 2px transparent);
+        stroke-opacity: 0;
     }
 }

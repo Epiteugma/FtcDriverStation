@@ -55,6 +55,8 @@
         let data = gamepads[gamepad.index];
         let packet = gamepad.latestData ? gamepad.latestData as GamepadPacket : new GamepadPacket();
 
+        let oldPacket = { ...packet };
+
         packet.user = gamepad === gamepad1 ? 1 : 2;
         packet.id = gamepad.index;
 
@@ -95,8 +97,14 @@
             else packet.b = false;
         }
 
+        for (let key in packet) {
+            if (packet[key] !== oldPacket[key]) {
+                gamepad.needsUpdate = true;
+                break;
+            }
+        }
+
         gamepad.latestData = packet;
-        gamepad.needsUpdate = (Date.now() - performance.now() + data.timestamp) + 10 > Number(gamepad.latestData.timestamp);
     }
 
     function bind(gamepads: globalThis.Gamepad[]) {
