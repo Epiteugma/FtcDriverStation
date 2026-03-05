@@ -49,7 +49,6 @@
         { hr: true },
     ]);
 
-    let lastTick: number;
     let lastPosition = { x: 0, y: 0, heading: 0 };
     let lastUpdate = { x: 0, y: 0, heading: 0 };
 
@@ -72,9 +71,8 @@
         new ResizeObserver(resize).observe(field);
 
         ctx = field.getContext('2d')!;
-        lastTick = Date.now();
 
-        tick();
+        draw();
     });
 
     function saveConfig() {
@@ -139,19 +137,6 @@
 
         field.width = size.width;
         field.height = size.height;
-    }
-
-    function tick() {
-        requestAnimationFrame(tick);
-
-        let delta = (Date.now() - lastTick) / 1000;
-        lastTick = Date.now();
-
-        position.x += velocity.x * delta;
-        position.y += velocity.y * delta;
-        position.heading += velocity.heading * delta;
-
-        draw();
     }
 
     function canvasHeuristics() {
