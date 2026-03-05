@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { TELEMETRY_NUMBER_REGEX as TELEMETRY_NUMBER_LINE_REGEX } from '../../util/robocol.svelte';
+    import { TELEMETRY_NUMBER_LINE_REGEX } from '../../util/robocol.svelte';
     import Telemetry from '../../librobocol/packets/telemetry';
 
     const HISTORY_TIME = 60e3;
@@ -52,10 +52,9 @@
     let ctx: CanvasRenderingContext2D = $state(null);
 
     onMount(() => {
-        window.addEventListener('message', (event) => processTelemetry(event.data));
         new ResizeObserver(resize).observe(graph);
-
         ctx = graph.getContext('2d')!;
+        
         draw();
     });
 
@@ -573,6 +572,8 @@
         tooltip.alignTop = tooltip.y - size.height < 0;
     }
 </script>
+
+<svelte:window onmessage={(event) => processTelemetry(event.data)} />
 
 <div class="holder">
     <!-- svelte-ignore a11y_click_events_have_key_events -->

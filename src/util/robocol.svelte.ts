@@ -71,12 +71,13 @@ export const robotControl = $state({
 export const popouts = $state({
     stackTrace: null,
     graphing: null,
+    fieldView: null,
 });
 
 export const TELEMETRY_SYSTEM_NONE_KEY = '$System$None$';
 export const TELEMETRY_SYSTEM_ERROR_KEY = '$System$Error$';
 export const TELEMETRY_SYSTEM_WARNING_KEY = '$System$Warning$';
-export const TELEMETRY_NUMBER_REGEX = /^(.*) : 0*(-?[0-9]+(?:\.[0-9]+)?)$/g;
+export const TELEMETRY_NUMBER_LINE_REGEX = /^(.*) : 0*(-?[0-9]+(?:\.[0-9]+)?)$/g;
 
 const BATTERY_LEVEL_KEY = '$Robot$Battery$Level$';
 const NO_VOLTAGE_SENSOR_KEY = '$no$voltage$sensor$';
@@ -174,6 +175,8 @@ export function loop() {
 
         robot.state = RobotState.Unknown;
         robot.batteryLevel = 0;
+
+        robotControl.timer.start = null;
         return;
     }
 
@@ -293,9 +296,8 @@ function handleTelemetry(packet: Telemetry) {
 
     robot.telemetry = packet;
 
-    if (popouts.graphing && !popouts.graphing.closed) {
-        popouts.graphing.postMessage(packet);
-    }
+    if (popouts.graphing && !popouts.graphing.closed) popouts.graphing.postMessage(packet);
+    if (popouts.fieldView && !popouts.fieldView.closed) popouts.fieldView.postMessage(packet);
 }
 
 function handleCommand(packet: Command) {
@@ -341,8 +343,11 @@ function handleCommand(packet: Command) {
             if (
                 opMode.flavor === 'AUTONOMOUS' && robotControl.timer.useAuto ||
                 opMode.flavor === 'TELEOP' && robotControl.timer.useTeleOp
-            ) robotControl.timer.start = Date.now();
-            
+            ) {
+                robotControl.timer.start = Date.now();
+                robotControl.timer.time = opMode.flavor === 'AUTONOMOUS' ? 30 : 120;
+            }
+
             break;
         case Commands.ShowStacktrace:
             if (popouts.stackTrace && !popouts.stackTrace.closed) return;

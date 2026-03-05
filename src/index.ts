@@ -32,6 +32,7 @@ function init() {
         let url = new URL(details.url);
         if (url.protocol !== 'file:') return { action: 'deny' };
 
+        let isFieldView = url.searchParams.has('fieldView');
         let isGraphing = url.searchParams.has('graphing');
 
         return {
@@ -41,8 +42,8 @@ function init() {
                 resizable: isGraphing,
                 minWidth: isGraphing ? 800 : 0,
                 minHeight: isGraphing ? 600 : 0,
-                width: isGraphing ? 800 : 800,
-                height: isGraphing ? 600 : 400,
+                width: isFieldView ? 750 : isGraphing ? 800 : 800,
+                height: isFieldView ? 1000 : isGraphing ? 600 : 400,
                 webPreferences: {
                     preload: join(app.getAppPath(), 'build/preload.js'),
                     backgroundThrottling: !isGraphing,
