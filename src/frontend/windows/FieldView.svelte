@@ -49,11 +49,8 @@
         { hr: true },
     ]);
 
-    let lastPosition = { x: 0, y: 0, heading: 0 };
-    let lastUpdate = { x: 0, y: 0, heading: 0 };
-
-    let position = { x: 0, y: 0, heading: 0 };
-    let velocity = { x: 0, y: 0, heading: 0 };
+    let lastPosition = { x: 0, y: 0, heading: 0, recv: 0 };
+    let position = { x: 0, y: 0, heading: 0, recv: 0 };
 
     function recursiveApply(src: any, dst: any) {
         for (let k in dst) {
@@ -97,38 +94,28 @@
 
         telemetryNumberKeys = telemetryNumberKeys.slice(0, 2);
 
+        let newPosition = {
+            x: undefined,
+            y: undefined,
+            heading: undefined,
+            recv: Date.now()
+        };
+
         for (let key in data) {
             telemetryNumberKeys.push({ name: key, value: key });
 
-            if (key === keys.x) {
-                let elapsed = (Date.now() - lastUpdate.x) / 1000;
+            if (key === keys.x) newPosition.x = data[key] * config.x.unit * config.x.direction;
+            if (key === keys.y) newPosition.y = data[key] * config.y.unit * config.y.direction;
+            if (key === keys.heading) newPosition.heading = data[key] * config.heading.unit * config.heading.direction;
+        }
 
-                lastPosition.x = position.x;
-                lastUpdate.x = Date.now();
+        if (newPosition.x != undefined || newPosition.y != undefined || newPosition.heading != undefined) {
+            newPosition.x ||= lastPosition.x;
+            newPosition.y ||= lastPosition.y;
+            newPosition.heading ||= lastPosition.heading;
 
-                position.x = data[key] * config.x.unit * config.x.direction;
-                velocity.x = (position.x - lastPosition.x) / elapsed;
-            }
-            
-            if (key === keys.y) {
-                let elapsed = (Date.now() - lastUpdate.y) / 1000;
-
-                lastPosition.y = position.y;
-                lastUpdate.y = Date.now();
-
-                position.y = data[key] * config.y.unit * config.y.direction;
-                velocity.y = (position.y - lastPosition.y) / elapsed;
-            }
-
-            if (key === keys.heading) {
-                let elapsed = (Date.now() - lastUpdate.heading) / 1000;
-
-                lastPosition.heading = position.heading;
-                lastUpdate.heading = Date.now();
-
-                position.heading = data[key] * config.heading.unit * config.heading.direction;
-                velocity.heading = (position.heading - lastPosition.heading) / elapsed;
-            }
+            lastPosition = position;
+            position = newPosition;
         }
     }
 
@@ -182,6 +169,7 @@
     }
 
     function draw() {
+        requestAnimationFrame(draw);
         ctx.clearRect(0, 0, field.width, field.height);
 
         let x0 = field.width * 0.5 - field.width * 0.5;
@@ -189,11 +177,20 @@
 
         ctx.drawImage(fieldImage, x0, y0, field.width, field.height);
 
-        let robot = toCanvasVec(position.x, position.y);
+        let interp = (Date.now() - position.recv) / (position.recv - lastPosition.recv);
+        if (interp > 1) interp = 1;
+
+        let interpPosition = {
+            x: lastPosition.x + (position.x - lastPosition.x) * interp,
+            y: lastPosition.y + (position.y - lastPosition.y) * interp,
+            heading: lastPosition.heading + (position.heading - lastPosition.heading) * interp,
+        };
+
+        let robot = toCanvasVec(interpPosition.x, interpPosition.y);
         let size = toCanvasDistance(0.4572);
         
         ctx.translate(robot.x, robot.y);
-        ctx.rotate(-position.heading);
+        ctx.rotate(-interpPosition.heading - config.front);
 
         ctx.lineWidth = field.width * 0.01;
         ctx.lineCap = 'round';
@@ -206,7 +203,7 @@
 
         ctx.stroke();
 
-        ctx.rotate(position.heading);
+        ctx.rotate(interpPosition.heading + config.front);
         ctx.translate(-robot.x, -robot.y);
     }
 </script>
@@ -233,8 +230,8 @@
         ]} bind:selected={config.origin} />
 
         <LabeledSelect options={[
-            { name: 'Facting +X', value: Math.PI * 0.5 },
-            { name: 'Facing -X', value: -Math.PI * 0.5 },
+            { name: 'Facing +X', value: -Math.PI * 0.5 },
+            { name: 'Facing -X', value: Math.PI * 0.5 },
             { name: 'Facing +Y', value: 0 },
             { name: 'Facing -Y', value: Math.PI },
         ]} bind:selected={config.front} />

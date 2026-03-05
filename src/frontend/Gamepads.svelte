@@ -129,8 +129,8 @@
 </script>
 
 <div class="gamepads">
-    <Gamepad style={gamepad1.index === -1 ? 'opacity: 0.5' : ''} />
-    <Gamepad style={gamepad2.index === -1 ? 'opacity: 0.5' : ''} />
+    {#key gamepad1.needsUpdate}<Gamepad style={gamepad1.index === -1 ? 'opacity: 0.5' : 'animation: gamepad-glow 1s'} />{/key}
+    {#key gamepad2.needsUpdate}<Gamepad style={gamepad2.index === -1 ? 'opacity: 0.5' : 'animation: gamepad-glow 1s'} />{/key}
 </div>
 
 <style>
