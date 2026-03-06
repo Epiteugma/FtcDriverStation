@@ -86,17 +86,21 @@
 
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <svg class="field-view" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" onclick={() => {
+        if (popouts.fieldView && !popouts.fieldView.closed) return;
+        popouts.fieldView = window.open(window.location.href + '?fieldView');
+    }}>
+        <path d="M324-111.5Q251-143 197-197t-85.5-127Q80-397 80-480t31.5-156Q143-709 197-763t127-85.5Q397-880 480-880t156 31.5Q709-817 763-763t85.5 127Q880-563 880-480t-31.5 156Q817-251 763-197t-127 85.5Q563-80 480-80t-156-31.5ZM480-160q56 0 105.5-17.5T676-227l-57-57q-29 21-64.5 32.5T480-240q-100 0-170-70t-70-170q0-100 70-170t170-70q100 0 170 70t70 170q0 39-12 75t-33 65l57 57q32-41 50-91t18-106q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-160q22 0 42.5-5.5T561-342l-61-61q-5 2-10 2.5t-10 .5q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 6-.5 11.5T557-458l60 60q11-18 17-38.5t6-43.5q0-66-47-113t-113-47q-66 0-113 47t-47 113q0 66 47 113t113 47Z"/>
+    </svg>
+
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <svg class="graphing" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" onclick={() => {
         if (popouts.graphing && !popouts.graphing.closed) return;
         popouts.graphing = window.open(window.location.href + '?graphing');
     }}>
         <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm406-80h85l69-69v-51h-34L606-200ZM306-400l121-120 80 80 203-204-56-56-147 147-80-80-177 177 56 56ZM200-200h34l120-120h-85l-69 69v51Zm341 0 120-120h-85L456-200h85Zm-149 0 120-120h-85L307-200h85Z"/>
     </svg>
-
-    <button style="width:auto" onclick={() => {
-        if (popouts.fieldView && !popouts.fieldView.closed) return;
-        popouts.fieldView = window.open(window.location.href + '?fieldView');
-    }}>Field view</button>
 </h2>
 
 <div class="telemetry">
@@ -144,11 +148,22 @@
     .graphing {
         height: 30px;
         width: 30px;
+        margin-left: 5px;
+        transition: .2s;
+    }
+
+    .field-view {
+        width: 24px;
+        height: 24px;
         margin-left: auto;
         transition: .2s;
     }
     .graphing:hover {
         fill: #04991c;
+    }
+
+    .field-view:hover {
+        fill: var(--primary);
     }
 
     .telemetry {

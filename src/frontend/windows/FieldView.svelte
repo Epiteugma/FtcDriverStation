@@ -47,6 +47,7 @@
     let telemetryNumberKeys = $state([
         { name: 'None', value: '' },
         { hr: true },
+        { name: 'A very long test key that will overflow the holder', value: 1 }
     ]);
 
     let lastPosition = { x: 0, y: 0, heading: 0, recv: 0 };

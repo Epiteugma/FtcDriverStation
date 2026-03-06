@@ -40,8 +40,7 @@
 <svelte:window onbeforeunload={(event) => {
     if (popouts.stackTrace && !popouts.stackTrace.closed) popouts.stackTrace.close();
     if (popouts.graphing && !popouts.graphing.closed) popouts.graphing.close();
-
-    return null;
+    if (popouts.fieldView && !popouts.fieldView.closed) popouts.fieldView.close();
 }} />
 
 <Navbar bind:tab />
