@@ -47,7 +47,6 @@
     let telemetryNumberKeys = $state([
         { name: 'None', value: '' },
         { hr: true },
-        { name: 'A very long test key that will overflow the holder', value: 1 }
     ]);
 
     let lastPosition = { x: 0, y: 0, heading: 0, recv: 0 };
@@ -109,6 +108,10 @@
             if (key === keys.y) newPosition.y = data[key] * config.y.unit * config.y.direction;
             if (key === keys.heading) newPosition.heading = data[key] * config.heading.unit * config.heading.direction;
         }
+
+        if (newPosition.x == undefined) telemetryNumberKeys.push({ name: keys.x, value: keys.x });
+        if (newPosition.y == undefined) telemetryNumberKeys.push({ name: keys.y, value: keys.y });
+        if (newPosition.heading == undefined) telemetryNumberKeys.push({ name: keys.heading, value: keys.heading });
 
         if (newPosition.x != undefined || newPosition.y != undefined || newPosition.heading != undefined) {
             newPosition.x ||= lastPosition.x;

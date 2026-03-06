@@ -25,7 +25,7 @@ function init() {
         },
     });
 
-    // window.setMenu(null);
+    window.setMenu(null);
     window.loadFile('assets/index.html');
 
     window.webContents.setWindowOpenHandler((details) => {
@@ -42,8 +42,8 @@ function init() {
                 resizable: isGraphing,
                 minWidth: isGraphing ? 800 : 0,
                 minHeight: isGraphing ? 600 : 0,
-                width: isFieldView ? 700 : isGraphing ? 800 : 800,
-                height: isFieldView ? 900 : isGraphing ? 600 : 400,
+                width: isFieldView ? 650 : isGraphing ? 800 : 800,
+                height: isFieldView ? 800 : isGraphing ? 600 : 400,
                 webPreferences: {
                     preload: join(app.getAppPath(), 'build/preload.js'),
                     backgroundThrottling: !isGraphing,
