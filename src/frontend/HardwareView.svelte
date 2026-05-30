@@ -75,6 +75,10 @@
     {/each}
 {/if}
 
+{#if device.xmlTag === 'Robot' && !device.children.length}
+    No devices found; try pressing 'Scan' to run discovery.
+{/if}
+
 {#each device.children as dev, i}
     <div class="device">
         {dev.name}

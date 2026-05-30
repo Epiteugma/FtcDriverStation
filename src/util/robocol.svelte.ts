@@ -49,7 +49,9 @@ export const robot = $state({
     configurations: [],
     deviceList: {},
     activeConfiguration: null,
-    onConfigurationReceived: null,
+    onConfigurationResponse: null,
+    onScanResponse: null,
+    onModuleDiscoveryResponse: null,
 
     systemTelemetry: null,
     telemetry: null,
@@ -103,6 +105,8 @@ export enum Commands {
 
     Scan = 'CMD_SCAN',
     ScanResp = 'CMD_SCAN_RESP',
+    DiscoverLynxModules = 'CMD_DISCOVER_LYNX_MODULES',
+    DiscoverLynxModulesResp = 'CMD_DISCOVER_LYNX_MODULES_RESP',
 
     ActivateConfig = 'CMD_ACTIVATE_CONFIGURATION',
     DeleteConfig = 'CMD_DELETE_CONFIGURATION',
@@ -383,7 +387,13 @@ function handleCommand(packet: Command) {
             robot.deviceList = deviceList;
             break;
         case Commands.RequestParticularConfigurationResp:
-            robot.onConfigurationReceived?.(packet.extra);
+            robot.onConfigurationResponse?.(packet.extra);
+            break;
+        case Commands.ScanResp:
+            robot.onScanResponse?.(packet.extra);
+            break;
+        case Commands.DiscoverLynxModulesResp:
+            robot.onModuleDiscoveryResponse?.(packet.extra);
             break;
     }
 }

@@ -37,6 +37,31 @@ export interface LynxModule extends DeviceConfiguration {
     i2c3: DeviceConfiguration[];
 }
 
+export enum DiscoveredLynxModuleImuType {
+    Unknown = 'unknown',
+    None = 'none',
+    BNO055 = 'BNO055',
+    BHI260 = 'BHI260',
+}
+
+export const EXPANSION_HUB_PRODUCT_NUMBER = 0x311152;
+export const CONTROL_HUB_INTERNAL_ADDRESS = 173;
+
+export interface DiscoveredLynxModule {
+    imuType: DiscoveredLynxModuleImuType;
+    moduleAddress: number;
+    revProductNumber: number;
+    isParent: boolean;
+}
+
+export enum UsbDeviceType {
+    FtdiUsbUnknown = 'FTDI_USB_UNKNOWN_DEVICE',
+    LynxUsb = 'LYNX_USB_DEVICE',
+    Webcam = 'WEBCAM',
+    Ethernet = 'ETHERNET_DEVICE',
+    Unknown = 'UNKNOWN_DEVICE',
+}
+
 const fxp = new XMLParser({ ignoreAttributes: false });
 const fxb = new XMLBuilder({ ignoreAttributes: false, suppressEmptyNode: true, format: true });
 
