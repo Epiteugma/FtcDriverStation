@@ -137,7 +137,12 @@
                 config = null;
                 savedDevice = null;
             }}>Save</button>
-            <button onclick={() => sendCommand(Commands.Scan)}>Scan</button>
+            <button onclick={() => {
+                if (!confirm('Are you sure you want to scan for devices? Unsaved changed may be lost.') return;)
+
+                sendCommand(Commands.Scan);
+                editing.isDirty = true;
+            }}>Scan</button>
         {:else}
             <button onclick={() => {
                 children.pop();
