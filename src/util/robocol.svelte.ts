@@ -47,7 +47,9 @@ export const robot = $state({
     activeOpMode: DEFAULT_OP_MODE_NAME,
 
     configurations: [],
+    deviceList: {},
     activeConfiguration: null,
+    onConfigurationReceived: null,
 
     systemTelemetry: null,
     telemetry: null,
@@ -92,6 +94,8 @@ export enum Commands {
     RequestActiveConfig = 'CMD_REQUEST_ACTIVE_CONFIG',
     RequestConfigurations = 'CMD_REQUEST_CONFIGURATIONS',
     RequestConfigurationsResp = 'CMD_REQUEST_CONFIGURATIONS_RESP',
+    RequestParticularConfiguration = 'CMD_REQUEST_PARTICULAR_CONFIGURATION',
+    RequestParticularConfigurationResp = 'CMD_REQUEST_PARTICULAR_CONFIGURATION_RESP',
     RequestUserDeviceTypes = 'CMD_REQUEST_USER_DEVICE_TYPES',
     RequestOpModeList = 'CMD_REQUEST_OP_MODE_LIST',
     RestartRobot = 'CMD_RESTART_ROBOT',
@@ -103,6 +107,7 @@ export enum Commands {
     DeleteConfig = 'CMD_DELETE_CONFIGURATION',
 
     NotifyActiveConfiguration = 'CMD_NOTIFY_ACTIVE_CONFIGURATION',
+    NotifyUserDeviceList = 'CMD_NOTIFY_USER_DEVICE_LIST',
     NotifyOpModeList = 'CMD_NOTIFY_OP_MODE_LIST',
     NotifyInitOpMode = 'CMD_NOTIFY_INIT_OP_MODE',
     NotifyRunOpMode = 'CMD_NOTIFY_RUN_OP_MODE',
@@ -199,13 +204,13 @@ export function loop() {
 
     processQueuedCommands();
 
-    if (connection.gamepad1.latestData && connection.gamepad1.needsUpdate) {        
+    if (connection.gamepad1.latestData && connection.gamepad1.needsUpdate) {
         if (connection.gamepad1.index === -1) {
             connection.gamepad1.latestData = new Gamepad();
             connection.gamepad1.latestData.user = 1;
             connection.gamepad1.latestData.id = -2;
         }
-        
+
         connection.gamepad1.latestData.seqNum = ++connection.seqNum;
         connection.gamepad1.latestData.timestamp = BigInt(Date.now());
 
@@ -237,6 +242,8 @@ export function sendCommand(name: string, extra?: any) {
     command.seqNum = ++connection.seqNum;
     command.name = name;
     command.extra = extra || '';
+
+    console.log('%c -> ', 'background-color: hotpink; color: white', command);
 
     window.robocol.sendPacket(command.serialize().buffer as ArrayBuffer, connection.remote);
     connection.commandQueue.set(command, [1, Date.now()]);
@@ -312,6 +319,8 @@ function handleCommand(packet: Command) {
         return;
     }
 
+    console.log('%c <- ', 'background-color: orange; color: white', packet);
+
     let ack = new Command(); // outgoing ACK
 
     ack.timestamp = packet.timestamp;
@@ -351,7 +360,7 @@ function handleCommand(packet: Command) {
             break;
         case Commands.ShowStacktrace:
             if (popouts.stackTrace && !popouts.stackTrace.closed) return;
-        
+
             popouts.stackTrace = window.open(window.location.href + '?' + new URLSearchParams({
                 stackTrace: packet.extra
             }).toString());
@@ -361,6 +370,19 @@ function handleCommand(packet: Command) {
             break;
         case Commands.NotifyActiveConfiguration:
             robot.activeConfiguration = packet.extra;
+            break;
+        case Commands.NotifyUserDeviceList:
+            let deviceList = {};
+
+            for (let i = 0; i < packet.extra?.length; i++) {
+                let device = packet.extra[i];
+                deviceList[device.xmlTag] = device;
+            }
+
+            robot.deviceList = deviceList;
+            break;
+        case Commands.RequestParticularConfigurationResp:
+            robot.onConfigurationReceived?.(packet.extra);
             break;
     }
 }

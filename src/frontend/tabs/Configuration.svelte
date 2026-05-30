@@ -1,18 +1,57 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { Commands, robot, sendCommand } from '../../util/robocol.svelte';
+    import HardwareView from '../HardwareView.svelte';
+    import { jsonToXML, xmlToJSON, type DeviceConfiguration } from '../../util/configuration';
 
-    let editing = $state(null);
+    let editing: {
+        isDirty: boolean;
+        name: string;
+    } | null = $state(null);
+
+    let config: DeviceConfiguration | null = $state(null);
+    let device: DeviceConfiguration | null = $state(null);
+
+    let disableActivate: boolean[] = $state([]);
+
+    function onConfigurationReceived(xml: string) {
+        config = device = xmlToJSON(xml);
+
+        console.log(xml);
+        console.log(jsonToXML(config as any));
+    }
+
+    onMount(() => {
+        robot.onConfigurationReceived = onConfigurationReceived;
+        return () => (robot.onConfigurationReceived = null);
+    });
 </script>
 
-{#if editing}
+{#if editing && config}
     <div>
-        <input type="text" placeholder="name">
-        <button>Save</button>
-        <button onclick={() => sendCommand(Commands.Scan)}>Scan</button>
-        <button class="danger" onclick={() => (editing = null)}>Cancel</button>
+        {#if !device?.parent}
+            <input type="text" placeholder="name" bind:value={editing.name}>
+            <button onclick={() => {
+                console.log(config);
+            }}>Save</button>
+            <button onclick={() => sendCommand(Commands.Scan)}>Scan</button>
+        {:else}
+            <button>Done</button>
+        {/if}
+        <button class="danger" onclick={() => {
+            if (device?.parent) device = device.parent;
+            else {
+                if (editing?.isDirty && !confirm('You have unsaved changes, are you sure you want to exit?')) return;
+                editing = null;
+            }
+        }}>Cancel</button>
     </div>
 
-    TODO
+    <HardwareView bind:device />
+{:else if editing}
+    <button class="danger" onclick={() => (editing = null)}>Cancel</button>
+
+    Awaiting configuation from robot controller...
 {:else}
     <div>
         <button onclick={() => (editing = { isDirty: false, name: '' })}>New</button>
@@ -23,14 +62,25 @@
         <div class="config">
             {config.name}
 
-            <button class="green" onclick={() => sendCommand(Commands.ActivateConfig, config)}>Activate</button>
-            <button onclick={() => (editing = config)}>Edit</button>
-            <button class="danger" onclick={() => {
-                if (!confirm('Are you sure that you want to delete ' + config.name + '?')) return;
+            <div class="buttons">
+                <button class="green" disabled={disableActivate[i]} onclick={() => {
+                    if (disableActivate[i]) return;
+                    sendCommand(Commands.ActivateConfig, config);
 
-                sendCommand(Commands.DeleteConfig, config);
-                robot.configurations.splice(i, 1);
-            }}>Delete</button>
+                    disableActivate[i] = true;
+                    setTimeout(() => (disableActivate[i] = false), 500);
+                }}>Activate</button>
+                <button onclick={() => {
+                    editing = config;
+                    sendCommand(Commands.RequestParticularConfiguration, config);
+                }}>Edit</button>
+                <button class="danger" onclick={() => {
+                    if (!confirm('Are you sure that you want to delete ' + config.name + '?')) return;
+
+                    sendCommand(Commands.DeleteConfig, config);
+                    robot.configurations.splice(i, 1);
+                }}>Delete</button>
+            </div>
         </div>
     {/each}
 
@@ -74,6 +124,7 @@
     .config {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 5px;
     }
 </style>

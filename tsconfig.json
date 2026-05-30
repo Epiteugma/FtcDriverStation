@@ -4,5 +4,6 @@
         "module": "esnext",
         "moduleResolution": "node",
         "verbatimModuleSyntax": true
-    }
+    },
+    "exclude": ["node_modules/**/*"]
 }

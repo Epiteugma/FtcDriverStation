@@ -1,0 +1,250 @@
+import { XMLParser } from 'fast-xml-parser';
+import XMLBuilder from 'fast-xml-builder';
+import { robot as robotState } from './robocol.svelte';
+
+export enum DeviceFlavor {
+    BuiltIn = 'BUILT_IN',
+    I2C = 'I2C',
+    Motor = 'MOTOR',
+    AnalogSensor = 'ANALOG_SENSOR',
+    Servo = 'SERVO',
+    DigitalIO = 'DIGITAL_IO',
+    AnalogOutput = 'ANALOG_OUTPUT',
+    EthernetOverUSB = 'ETHERNET_OVER_USB',
+}
+
+export interface DeviceConfiguration {
+    flavor: DeviceFlavor;
+    xmlTag: string;
+    name: string;
+    parent: DeviceConfiguration | undefined;
+    children: DeviceConfiguration[];
+    port?: number;
+}
+
+export interface SerialDevice extends DeviceConfiguration {
+    serialNumber: string;
+    parentModuleAddress?: number;
+}
+
+export interface LynxModule extends DeviceConfiguration {
+    motors: DeviceConfiguration[];
+    servos: DeviceConfiguration[];
+    digital: DeviceConfiguration[];
+    analog: DeviceConfiguration[];
+    i2c0: DeviceConfiguration[];
+    i2c1: DeviceConfiguration[];
+    i2c2: DeviceConfiguration[];
+    i2c3: DeviceConfiguration[];
+}
+
+const fxp = new XMLParser({ ignoreAttributes: false });
+const fxb = new XMLBuilder({ ignoreAttributes: false, suppressEmptyNode: true, format: true });
+
+function parseDevice(parent: DeviceConfiguration, tag: string, root: any) {
+    let deviceInfo = robotState.deviceList[tag];
+
+    if (!deviceInfo) {
+        console.warn('Unknown device encoutered: ' + tag + ', skipped.');
+        return;
+    }
+
+    let device: DeviceConfiguration = {
+        xmlTag: tag,
+        name: root['@_name'],
+        flavor: deviceInfo.flavor,
+        children: [],
+        parent,
+    };
+
+    if (!device.name) {
+        console.warn('Unnamed device encountered: ' + tag + ', skipped.');
+        return;
+    }
+
+    if (root['@_serialNumber']) {
+        let serial = device as unknown as SerialDevice;
+        let pma = Number(root['@_parentModuleAddress']);
+
+        serial.serialNumber = root['@_serialNumber'];
+        if (!isNaN(pma)) serial.parentModuleAddress = pma;
+    }
+
+    if (tag === 'LynxModule') {
+        let mod = device as unknown as LynxModule;
+
+        mod.port = Number(root['@_port']);
+        mod.motors = [];
+        mod.servos = [];
+        mod.digital = [];
+        mod.analog = [];
+        mod.i2c0 = [];
+        mod.i2c1 = [];
+        mod.i2c2 = [];
+        mod.i2c3 = [];
+    }
+
+    if (parent.xmlTag === 'LynxModule') {
+        let mod = parent as unknown as LynxModule;
+
+        device.port = Number(root['@_port']);
+
+        switch (device.flavor) {
+            case DeviceFlavor.Motor:
+                mod.motors.push(device);
+                break;
+            case DeviceFlavor.Servo:
+                mod.servos.push(device);
+                break;
+            case DeviceFlavor.DigitalIO:
+                mod.digital.push(device);
+                break;
+            case DeviceFlavor.AnalogSensor:
+                mod.analog.push(device);
+                break;
+            case DeviceFlavor.I2C:
+                let bus = Number(root['@_bus']);
+
+                if (bus < 0 || bus > 3) {
+                    console.warn('I2C device on unknown bus: ' + bus + ', skipped.');
+                    return;
+                }
+
+                let buses = [mod.i2c0, mod.i2c1, mod.i2c2, mod.i2c3];
+                buses[bus].push(device);
+
+                break;
+            default:
+                console.warn('Unknown flavor device on LynxModule: ' + tag + ' (' + device.flavor + '), skipped.');
+                break;
+        }
+
+        return;
+    }
+
+    for (let tag in root) {
+        if (tag.startsWith('@_')) continue; // skip attributes
+        let child = root[tag];
+
+        if (!Array.isArray(child)) {
+            parseDevice(device, tag, child);
+            continue;
+        }
+
+        for (let i = 0; i < child.length; i++) parseDevice(device, tag, child[i]);
+    }
+
+    parent.children.push(device);
+}
+
+export function xmlToJSON(xml: string) {
+    let parsed = fxp.parse(xml);
+    let root = parsed.Robot;
+
+    let robot = {
+        xmlTag: 'Robot',
+        name: root['@_name'],
+        flavor: DeviceFlavor.BuiltIn,
+        children: [],
+        parent: null,
+    };
+
+    if (!root) return robot;
+
+    for (let tag in root) {
+        if (tag.startsWith('@_')) continue; // skip attributes
+        let child = root[tag];
+
+        if (!Array.isArray(child)) {
+            parseDevice(robot, tag, child);
+            continue;
+        }
+
+        for (let i = 0; i < child.length; i++) parseDevice(robot, tag, child[i]);
+    }
+
+    return robot;
+}
+
+function serializeDevice(parent: any, parentTag: string, device: DeviceConfiguration, bus?: number) {
+    let xml = { '@_name': device.name };
+
+    if (!device.name) {
+        console.warn('Unnamed device: ', device.xmlTag, ', skipped.');
+        return;
+    }
+
+    if ('serialNumber' in device) {
+        xml['@_serialNumber'] = device.serialNumber;
+
+        if ('parentModuleAddress' in device) {
+            xml['@_parentModuleAddress'] = device.parentModuleAddress.toString();
+        }
+    }
+
+    if (parentTag === 'LynxModule') {
+        xml['@_port'] = device.port.toString();
+
+        switch (device.flavor) {
+            case DeviceFlavor.Motor:
+            case DeviceFlavor.Servo:
+            case DeviceFlavor.DigitalIO:
+            case DeviceFlavor.AnalogSensor:
+                break;
+            case DeviceFlavor.I2C:
+                xml['@_bus'] = bus.toString();
+                break;
+            default:
+                console.warn('Unknown flavor device on LynxModule: ' + device.xmlTag + ' (' + device.flavor + '), skipped.');
+                return;
+        }
+
+        if (!parent[device.xmlTag]) parent[device.xmlTag] = xml;
+        else if (Array.isArray(parent[device.xmlTag])) parent[device.xmlTag].push(xml);
+        else parent[device.xmlTag] = [parent[device.xmlTag], xml];
+
+        return;
+    }
+
+    if (device.xmlTag === 'LynxModule') {
+        xml['@_port'] = device.port.toString();
+
+        let mod = device as unknown as LynxModule;
+
+        for (let i = 0; i < mod.motors.length; i++) serializeDevice(xml, device.xmlTag, mod.motors[i]);
+        for (let i = 0; i < mod.servos.length; i++) serializeDevice(xml, device.xmlTag, mod.servos[i]);
+        for (let i = 0; i < mod.digital.length; i++) serializeDevice(xml, device.xmlTag, mod.digital[i]);
+        for (let i = 0; i < mod.analog.length; i++) serializeDevice(xml, device.xmlTag, mod.analog[i]);
+
+        let buses = [mod.i2c0, mod.i2c1, mod.i2c2, mod.i2c3];
+
+        for (let i = 0; i < buses.length; i++) {
+            for (let j = 0; j < buses[i].length; j++) serializeDevice(xml, device.xmlTag, buses[i][j], i);
+        }
+    } else {
+        for (let i = 0; i < device.children.length; i++) serializeDevice(xml, device.xmlTag, device.children[i]);
+    }
+
+    if (!parent[device.xmlTag]) parent[device.xmlTag] = xml;
+    else if (Array.isArray(parent[device.xmlTag])) parent[device.xmlTag].push(xml);
+    else parent[device.xmlTag] = [parent[device.xmlTag], xml];
+}
+
+export function jsonToXML(json: DeviceConfiguration) {
+    let xml = {
+        '?xml': {
+            '@_version': '1.0',
+            '@_encoding': 'UTF-8',
+            '@_standalone': 'yes',
+        },
+        Robot: {},
+    };
+
+    if (json.xmlTag !== 'Robot') return fxb.build(xml);
+
+    for (let i = 0; i < json.children.length; i++) {
+        serializeDevice(xml.Robot, 'Robot', json.children[i]);
+    }
+
+    return fxb.build(xml);
+}

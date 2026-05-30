@@ -17,5 +17,9 @@
 		"svelte": "^5.46.3",
 		"svelte-preprocess": "^6.0.3",
 		"typescript": "^5.9.3"
+	},
+	"dependencies": {
+		"fast-xml-builder": "^1.2.0",
+		"fast-xml-parser": "^5.8.0"
 	}
 }
