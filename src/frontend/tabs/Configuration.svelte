@@ -138,7 +138,7 @@
                 savedDevice = null;
             }}>Save</button>
             <button onclick={() => {
-                if (!confirm('Are you sure you want to scan for devices? Unsaved changed may be lost.') return;)
+                if (!confirm('Are you sure you want to scan for devices? Unsaved changed may be lost.')) return;
 
                 sendCommand(Commands.Scan);
                 editing.isDirty = true;
