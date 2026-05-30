@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { RobotState } from '../librobocol/types';
     import { connection, robot, sendCommand, Commands } from '../util/robocol.svelte';
 

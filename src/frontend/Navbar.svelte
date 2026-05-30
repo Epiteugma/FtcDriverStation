@@ -1,4 +1,6 @@
 <script lang="ts">
+    import PeerDiscovery from "../librobocol/packets/peerDiscovery";
+
     let { tab = $bindable(0) } = $props();
 </script>
 
@@ -20,6 +22,11 @@
     </button>
 
     <span>
+        <span style="color: #777; margin-left: 0">{(() => {
+            let peerDiscovery = new PeerDiscovery();
+            return `V${peerDiscovery.sdkMajorVersion}.${peerDiscovery.sdkMinorVersion} (robocol@${peerDiscovery.robocolVersion})`;
+        })()}</span> <br>
+
         by Team #13906 <br>
         Epiteugma Revved Up
     </span>
@@ -87,7 +94,7 @@
         align-items: center;
         gap: 15px;
     }
-    
+
     span {
         font-size: 12px;
         margin-top: auto;

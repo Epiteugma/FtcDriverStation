@@ -17,7 +17,6 @@ export interface DeviceConfiguration {
     flavor: DeviceFlavor;
     xmlTag: string;
     name: string;
-    parent: DeviceConfiguration | undefined;
     children: DeviceConfiguration[];
     port?: number;
 }
@@ -54,7 +53,6 @@ function parseDevice(parent: DeviceConfiguration, tag: string, root: any) {
         name: root['@_name'],
         flavor: deviceInfo.flavor,
         children: [],
-        parent,
     };
 
     if (!device.name) {
@@ -146,7 +144,6 @@ export function xmlToJSON(xml: string): DeviceConfiguration {
         name: '',
         flavor: DeviceFlavor.BuiltIn,
         children: [],
-        parent: null,
     };
 
     if (!root) return robot;

@@ -21,27 +21,58 @@
         robot.onConfigurationReceived = onConfigurationReceived;
         return () => (robot.onConfigurationReceived = null);
     });
+
+    let savedDevice: DeviceConfiguration | null = $state(null);
+
+    $effect(() => {
+        if (!config || !children.length) return;
+
+        let device = config;
+
+        for (let i = 0; i < children.length; i++) {
+            device = device.children[children[i]];
+        }
+
+        savedDevice = JSON.parse(JSON.stringify(device));
+    });
 </script>
 
 {#if editing && config}
     <div>
         {#if !children.length}
             <input type="text" placeholder="name" bind:value={editing.name}>
-            <button onclick={() => {
+            <button disabled={!editing.name} onclick={() => {
                 sendCommand(Commands.SaveConfiguration, JSON.stringify(editing) + ';' + jsonToXML(config!));
 
                 editing = null;
                 config = null;
+                savedDevice = null;
             }}>Save</button>
             <button onclick={() => sendCommand(Commands.Scan)}>Scan</button>
         {:else}
-            <button>Done</button>
+            <button onclick={() => {
+                children.pop();
+                editing!.isDirty = true;
+            }}>Done</button>
         {/if}
         <button class="danger" onclick={() => {
-            if (children.length) children.pop();
-            else {
+            if (children.length) {
+                let child = children.pop()!;
+                let root = config;
+
+                if (savedDevice) {
+                    for (let i = 0; i < children.length; i++) {
+                        root = root!.children[children[i]];
+                    }
+
+                    root!.children[child] = savedDevice;
+                }
+            } else {
+                if (editing!.isDirty && !confirm('You have unsaved changes, are you sure you want to exit?')) return;
+
                 editing = null;
                 config = null;
+                savedDevice = null;
             }
         }}>Cancel</button>
     </div>

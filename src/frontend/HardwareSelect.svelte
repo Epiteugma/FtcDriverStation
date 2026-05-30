@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { DeviceFlavor } from '../util/configuration';
     import { robot } from '../util/robocol.svelte';
 

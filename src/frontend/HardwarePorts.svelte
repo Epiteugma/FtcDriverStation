@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { DeviceFlavor } from '../util/configuration';
     import HardwareSelect from './HardwareSelect.svelte';
 
@@ -14,16 +14,16 @@
             <div class="port-number">{port}</div>
 
             {#if device}
-                <HardwareSelect bind:value={device.xmlTag} {flavor} onchange={(value) => {
+                <HardwareSelect bind:value={device.xmlTag} {flavor} onchange={(value: string) => {
                     if (value) return;
                     devices.splice(devices.indexOf(device), 1);
                 }} />
                 <input type="text" placeholder="Device name" bind:value={device.name} />
             {:else}
-                <HardwareSelect {flavor} onchange={(value) => {
+                <HardwareSelect {flavor} onchange={(value: string) => {
                     if (!value) return;
 
-                    let device = $state({ xmlTag: value, flavor, port, children: [], parent });
+                    let device = $state({ xmlTag: value, flavor, port, children: [] });
                     devices.push(device);
                 }} />
                 <input type="text" placeholder="Device name" disabled />

@@ -25,7 +25,7 @@ function init() {
         },
     });
 
-    window.setMenu(null);
+    // window.setMenu(null);
     window.loadFile('assets/index.html');
 
     window.webContents.setWindowOpenHandler((details) => {

@@ -1,5 +1,5 @@
-<script>
-    import { DeviceFlavor } from '../util/configuration';
+<script lang="ts">
+    import { DeviceFlavor, type DeviceConfiguration } from '../util/configuration';
     import HardwarePorts from './HardwarePorts.svelte';
 
     let { config = $bindable(null), children = $bindable([]) } = $props();
@@ -21,10 +21,10 @@
     );
 
     let i2cMinPorts = $derived(i2cBuses.map(
-        bus => bus.reduce((prev, curr) => Math.max(prev, curr.port + 1), 0)
+        bus => bus.reduce((prev: number, curr: DeviceConfiguration) => Math.max(prev, curr.port! + 1), 0)
     ));
 
-    let i2cPorts = $state([]);
+    let i2cPorts: number[] = $state([]);
 
     $effect(() => {
         if (lastDevice === device) return;
@@ -34,7 +34,7 @@
 
         for (let i = 0; i < i2cBuses.length; i++) {
             let bus = i2cBuses[i];
-            i2cPorts[i] = bus.reduce((prev, curr) => Math.max(prev, curr.port + 1), 0);
+            i2cPorts[i] = bus.reduce((prev: number, curr: DeviceConfiguration) => Math.max(prev, curr.port! + 1), 0);
         }
     });
 
