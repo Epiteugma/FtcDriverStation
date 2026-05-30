@@ -10,15 +10,11 @@
     } | null = $state(null);
 
     let config: DeviceConfiguration | null = $state(null);
-    let device: DeviceConfiguration | null = $state(null);
-
-    let disableActivate: boolean[] = $state([]);
+    let children: number[] = $state([]);
 
     function onConfigurationReceived(xml: string) {
-        config = device = xmlToJSON(xml);
-
-        console.log(xml);
-        console.log(jsonToXML(config as any));
+        config = xmlToJSON(xml);
+        children = [];
     }
 
     onMount(() => {
@@ -29,32 +25,38 @@
 
 {#if editing && config}
     <div>
-        {#if !device?.parent}
+        {#if !children.length}
             <input type="text" placeholder="name" bind:value={editing.name}>
             <button onclick={() => {
-                console.log(config);
+                sendCommand(Commands.SaveConfiguration, JSON.stringify(editing) + ';' + jsonToXML(config!));
+
+                editing = null;
+                config = null;
             }}>Save</button>
             <button onclick={() => sendCommand(Commands.Scan)}>Scan</button>
         {:else}
             <button>Done</button>
         {/if}
         <button class="danger" onclick={() => {
-            if (device?.parent) device = device.parent;
+            if (children.length) children.pop();
             else {
-                if (editing?.isDirty && !confirm('You have unsaved changes, are you sure you want to exit?')) return;
                 editing = null;
+                config = null;
             }
         }}>Cancel</button>
     </div>
 
-    <HardwareView bind:device />
+    <HardwareView bind:config bind:children />
 {:else if editing}
     <button class="danger" onclick={() => (editing = null)}>Cancel</button>
 
     Awaiting configuation from robot controller...
 {:else}
     <div>
-        <button onclick={() => (editing = { isDirty: false, name: '' })}>New</button>
+        <button onclick={() => {
+            editing = { isDirty: false, name: '' };
+            config = xmlToJSON('');
+        }}>New</button>
         <span style="margin-left: 10px">Active configuration: {robot.activeConfiguration?.name || 'None'}</span>
     </div>
 
@@ -63,12 +65,8 @@
             {config.name}
 
             <div class="buttons">
-                <button class="green" disabled={disableActivate[i]} onclick={() => {
-                    if (disableActivate[i]) return;
+                <button class="green" onclick={() => {
                     sendCommand(Commands.ActivateConfig, config);
-
-                    disableActivate[i] = true;
-                    setTimeout(() => (disableActivate[i] = false), 500);
                 }}>Activate</button>
                 <button onclick={() => {
                     editing = config;

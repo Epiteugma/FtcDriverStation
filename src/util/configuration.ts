@@ -137,13 +137,13 @@ function parseDevice(parent: DeviceConfiguration, tag: string, root: any) {
     parent.children.push(device);
 }
 
-export function xmlToJSON(xml: string) {
+export function xmlToJSON(xml: string): DeviceConfiguration {
     let parsed = fxp.parse(xml);
     let root = parsed.Robot;
 
     let robot = {
         xmlTag: 'Robot',
-        name: root['@_name'],
+        name: '',
         flavor: DeviceFlavor.BuiltIn,
         children: [],
         parent: null,

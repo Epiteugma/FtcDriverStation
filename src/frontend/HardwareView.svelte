@@ -1,10 +1,20 @@
 <script>
-    import { onMount } from 'svelte';
     import { DeviceFlavor } from '../util/configuration';
     import HardwarePorts from './HardwarePorts.svelte';
 
+    let { config = $bindable(null), children = $bindable([]) } = $props();
+
     let lastDevice = $state(null);
-    let { device = $bindable(null) } = $props();
+    let device = $derived.by(() => {
+        let current = config;
+
+        for (let i = 0; i < children.length; i++) {
+            current = current.children[children[i]];
+        }
+
+        return current;
+    });
+
 
     let i2cBuses = $derived(
         device.xmlTag === 'LynxModule' ? [device.i2c0, device.i2c1, device.i2c2, device.i2c3] : []
@@ -68,7 +78,7 @@
 {#each device.children as dev, i}
     <div class="device">
         {dev.name}
-        <button onclick={() => (device = dev)}>Configure</button>
+        <button onclick={() => children.push(i)}>Configure</button>
     </div>
 {/each}
 

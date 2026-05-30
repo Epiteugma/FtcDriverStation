@@ -98,6 +98,7 @@ export enum Commands {
     RequestParticularConfigurationResp = 'CMD_REQUEST_PARTICULAR_CONFIGURATION_RESP',
     RequestUserDeviceTypes = 'CMD_REQUEST_USER_DEVICE_TYPES',
     RequestOpModeList = 'CMD_REQUEST_OP_MODE_LIST',
+    SaveConfiguration = 'CMD_SAVE_CONFIGURATION',
     RestartRobot = 'CMD_RESTART_ROBOT',
 
     Scan = 'CMD_SCAN',
