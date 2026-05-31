@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { Commands, robot, sendCommand } from '../../util/robocol.svelte';
     import HardwareView from '../HardwareView.svelte';
-    import { CONTROL_HUB_INTERNAL_ADDRESS, DeviceFlavor, DiscoveredLynxModuleImuType, jsonToXML, UsbDeviceType, xmlToJSON, type DeviceConfiguration, type DiscoveredLynxModule, type LynxModule, type SerialDevice } from '../../util/configuration';
+    import { chooseName, CONTROL_HUB_INTERNAL_ADDRESS, DeviceFlavor, DiscoveredLynxModuleImuType, EXPANSION_HUB_PRODUCT_NUMBER, jsonToXML, SERVO_HUB_PRODUCT_NUMBER, UsbDeviceType, xmlToJSON, type DeviceConfiguration, type DiscoveredLynxModule, type LynxModule, type SerialDevice } from '../../util/configuration';
 
     let editing: {
         isDirty: boolean;
@@ -12,95 +12,165 @@
     let config: DeviceConfiguration | null = $state(null);
     let children: number[] = $state([]);
 
+    let scanning = $state(false);
+    let discovery: string[] = $state([]);
+
     function onConfigurationReceived(xml: string) {
         config = xmlToJSON(xml);
         children = [];
     }
 
-    function onScanResponse(devices: { errorMessage: string; map: { [key: string]: UsbDeviceType } }) {
-        if (!config) return;
-        let keys = Object.keys(devices.map);
+    function onScanResponse(devices: { errorMessage: string; map: { key: string; value: UsbDeviceType }[] }) {
+        scanning = false;
+        discovery = [];
 
-        for (let i = 0; i < keys.length; i++) {
-            let serialNumber = keys[i];
-            let type = devices.map[serialNumber];
-            let childIndex = config.children.findIndex(dev => (dev as SerialDevice).serialNumber == serialNumber);
+        if (!config) return;
+
+        let names = [];
+        let children = [];
+
+        for (let i = 0; i < devices.map.length; i++) {
+            let device = devices.map[i];
+            let childIndex = config.children.findIndex(dev => (dev as SerialDevice).serialNumber == device.key);
 
             if (childIndex < 0) {
                 let xmlTag = '';
+                let name = '';
 
-                switch (type) {
-                    case UsbDeviceType.FtdiUsbUnknown:
-                        // TODO: ignore? check DS code
-                        break;
+                switch (device.value) {
                     case UsbDeviceType.LynxUsb:
-                        xmlTag = 'LynxModule';
-                        sendCommand(Commands.DiscoverLynxModules, serialNumber);
+                        xmlTag = 'LynxUsbDevice';
+
+                        name = device.key === '(embedded)' ?
+                            chooseName(names, 'Control Hub Portal', 'Expansion Hub Portal %d', 0) :
+                            chooseName(names, undefined, 'Expansion Hub Portal %d');
+
+                        sendCommand(Commands.DiscoverLynxModules, device.key);
                         break;
                     case UsbDeviceType.Webcam:
                         xmlTag = 'Webcam';
+                        name = chooseName(names, undefined, 'Webcam %d');
                         break;
                     case UsbDeviceType.Ethernet:
                         xmlTag = 'EthernetDevice';
+                        name = 'Ethernet Device';
                         break;
                 }
 
                 if (!xmlTag) continue;
 
-                config.children.push({
+                let child = {
                     xmlTag,
-                    name: 'Scanned ' + ~~(Math.random() * 1024),
-                    serialNumber,
+                    name,
+                    serialNumber: device.key,
                     flavor: DeviceFlavor.BuiltIn,
                     children: [],
-                } as SerialDevice);
+                } as SerialDevice;
+
+                if (device.value === UsbDeviceType.Ethernet) {
+                    let ip = child.serialNumber.split(':')[2] || '127.0.0.1';
+                    let split = ip.split('.');
+
+                    if (split.length !== 4) split = '127.0.0.1'.split('.');
+                    split[3] = '1';
+
+                    child.ipAddress = split.join('.');
+                }
+
+                names.push(child.name);
+                children.push(child);
+            } else {
+                names.push(config.children[childIndex].name);
+                children.push(config.children[childIndex]);
             }
 
-            if (type === UsbDeviceType.LynxUsb) sendCommand(Commands.DiscoverLynxModules, serialNumber);
+            if (device.value === UsbDeviceType.LynxUsb) {
+                sendCommand(Commands.DiscoverLynxModules, device.key);
+                discovery.push(device.key);
+            }
         }
+
+        config.children = children;
     }
 
     function onModuleDiscoveryResponse(response: { serialNumber: string; modules: DiscoveredLynxModule[]; }) {
-        let usbModule = config?.children.find(dev => (dev as SerialDevice).serialNumber == response.serialNumber);
-        if (!config || !usbModule) return;
+        discovery.splice(discovery.indexOf(response.serialNumber), 1);
+        if (!discovery.length && !scanning && editing) editing.isDirty = true;
+
+        let usbModule = config?.children.find(dev => (dev as SerialDevice).serialNumber == response.serialNumber) as SerialDevice | undefined;
+        if (!usbModule) return;
+
+        let names: string[] = [];
+        let modules = [];
 
         for (let i = 0; i < response.modules.length; i++) {
             let module = response.modules[i];
             let existing = usbModule.children.find(dev => dev.port == module.moduleAddress);
 
-            if (existing) continue;
-
-            let mod: LynxModule = {
-                xmlTag: 'LynxModule',
-                name: module.moduleAddress == CONTROL_HUB_INTERNAL_ADDRESS ? 'Control Hub' : 'Expansion Hub ' + module.moduleAddress, // todo: double check how real DS does this
-                port: module.moduleAddress,
-                flavor: DeviceFlavor.BuiltIn,
-                children: [],
-                motors: [],
-                servos: [],
-                digital: [],
-                analog: [],
-                i2c0: [],
-                i2c1: [],
-                i2c2: [],
-                i2c3: [],
-            };
-
-            switch (module.imuType) {
-                case DiscoveredLynxModuleImuType.BNO055:
-                case DiscoveredLynxModuleImuType.BHI260:
-                    mod.i2c0.push({
-                        xmlTag: module.imuType == DiscoveredLynxModuleImuType.BNO055 ? 'LynxEmbeddedIMU' : 'ControlHubImuBHI260AP',
-                        name: 'imu',
-                        flavor: DeviceFlavor.I2C,
-                        port: 0,
-                        children: [],
-                    });
-                    break;
+            if (existing) {
+                names.push(existing.name);
+                modules.push(existing);
+                continue;
             }
 
-            usbModule.children.push(mod);
+            let isEmbeddedControlHub =
+                usbModule.serialNumber === '(embedded)' &&
+                module.revProductNumber === EXPANSION_HUB_PRODUCT_NUMBER &&
+                module.isParent &&
+                module.moduleAddress === CONTROL_HUB_INTERNAL_ADDRESS
+            ;
+
+            let device: DeviceConfiguration | null = null;
+
+            if (module.revProductNumber === EXPANSION_HUB_PRODUCT_NUMBER) {
+                device = {
+                    xmlTag: 'LynxModule',
+                    name: isEmbeddedControlHub ?
+                        chooseName(names, 'Control Hub', 'Expansion Hub %d', 0) :
+                        chooseName(names, undefined, 'Expansion Hub %d', module.moduleAddress),
+                    port: module.moduleAddress,
+                    flavor: DeviceFlavor.BuiltIn,
+                    children: [],
+                    motors: [],
+                    servos: [],
+                    digital: [],
+                    analog: [],
+                    i2c0: [],
+                    i2c1: [],
+                    i2c2: [],
+                    i2c3: [],
+                };
+
+                switch (module.imuType) {
+                    case DiscoveredLynxModuleImuType.BNO055:
+                    case DiscoveredLynxModuleImuType.BHI260:
+                        (device as LynxModule).i2c0.push({
+                            xmlTag: module.imuType == DiscoveredLynxModuleImuType.BNO055 ?
+                                'LynxEmbeddedIMU' :
+                                'ControlHubImuBHI260AP',
+                            name: 'imu',
+                            flavor: DeviceFlavor.I2C,
+                            port: 0,
+                            children: [],
+                        });
+                        break;
+                }
+            } else if (module.revProductNumber === SERVO_HUB_PRODUCT_NUMBER) {
+                device = {
+                    xmlTag: 'ServoHub',
+                    name: chooseName(names, undefined, 'Servo Hub %d'),
+                    flavor: DeviceFlavor.BuiltIn,
+                    children: [],
+                };
+            }
+
+            if (device) {
+                names.push(device.name);
+                modules.push(device);
+            }
         }
+
+        usbModule.children = modules;
     }
 
     onMount(() => {
@@ -108,7 +178,11 @@
         robot.onScanResponse = onScanResponse;
         robot.onModuleDiscoveryResponse = onModuleDiscoveryResponse;
 
-        return () => (robot.onConfigurationResponse = null);
+        return () => {
+            robot.onConfigurationResponse = null;
+            robot.onScanResponse = null;
+            robot.onModuleDiscoveryResponse = null;
+        };
     });
 
     let savedDevice: DeviceConfiguration | null = $state(null);
@@ -137,12 +211,12 @@
                 config = null;
                 savedDevice = null;
             }}>Save</button>
-            <button onclick={() => {
+            <button disabled={scanning || !!discovery.length} onclick={() => {
                 if (!confirm('Are you sure you want to scan for devices? Unsaved changed may be lost.')) return;
 
                 sendCommand(Commands.Scan);
-                editing.isDirty = true;
-            }}>Scan</button>
+                scanning = true;
+            }}>{scanning || discovery.length ? 'Scanning' : 'Scan'}</button>
         {:else}
             <button onclick={() => {
                 children.pop();
@@ -181,6 +255,9 @@
         <button onclick={() => {
             editing = { isDirty: false, name: '' };
             config = xmlToJSON('');
+
+            sendCommand(Commands.Scan);
+            scanning = true;
         }}>New</button>
         <span style="margin-left: 10px">Active configuration: {robot.activeConfiguration?.name || 'None'}</span>
     </div>

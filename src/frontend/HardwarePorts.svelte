@@ -2,7 +2,7 @@
     import { DeviceFlavor } from '../util/configuration';
     import HardwareSelect from './HardwareSelect.svelte';
 
-    let { ports = $bindable(0), parent = $bindable(null), devices = $bindable([]), flavor = DeviceFlavor.BuiltIn, pairs = false } = $props();
+    let { ports = $bindable(0), devices = $bindable([]), flavor = DeviceFlavor.BuiltIn, pairs = false } = $props();
 </script>
 
 {#each new Array(ports / (pairs ? 2 : 1)) as _, i}

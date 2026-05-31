@@ -24,6 +24,7 @@ export interface DeviceConfiguration {
 export interface SerialDevice extends DeviceConfiguration {
     serialNumber: string;
     parentModuleAddress?: number;
+    ipAddress?: string;
 }
 
 export interface LynxModule extends DeviceConfiguration {
@@ -45,6 +46,7 @@ export enum DiscoveredLynxModuleImuType {
 }
 
 export const EXPANSION_HUB_PRODUCT_NUMBER = 0x311152;
+export const SERVO_HUB_PRODUCT_NUMBER = 0x111855;
 export const CONTROL_HUB_INTERNAL_ADDRESS = 173;
 
 export interface DiscoveredLynxModule {
@@ -90,6 +92,8 @@ function parseDevice(parent: DeviceConfiguration, tag: string, root: any) {
         let pma = Number(root['@_parentModuleAddress']);
 
         serial.serialNumber = root['@_serialNumber'];
+        serial.ipAddress = root['@_ipAddress'];
+
         if (!isNaN(pma)) serial.parentModuleAddress = pma;
     }
 
@@ -202,6 +206,10 @@ function serializeDevice(parent: any, parentTag: string, device: DeviceConfigura
         if ('parentModuleAddress' in device) {
             xml['@_parentModuleAddress'] = device.parentModuleAddress.toString();
         }
+
+        if ('ipAddress' in device) {
+            xml['@_ipAddress'] = device.ipAddress;
+        }
     }
 
     if (parentTag === 'LynxModule') {
@@ -269,4 +277,21 @@ export function jsonToXML(json: DeviceConfiguration) {
     }
 
     return fxb.build(xml);
+}
+
+export function chooseName(names: string[], firstChoice: string | undefined, format: string, id = 1) {
+    if (firstChoice && !names.includes(firstChoice)) return firstChoice;
+
+    let formatted = format.replace('%d', id + '');
+
+    if (!names.includes(formatted)) return formatted;
+
+    let i = 0;
+
+    do {
+        i++;
+        formatted = format.replace('%d', i + '');
+    } while (names.includes(formatted));
+
+    return formatted;
 }

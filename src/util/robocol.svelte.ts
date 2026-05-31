@@ -321,6 +321,11 @@ function handleCommand(packet: Command) {
             break;
         }
 
+        // configuration change ACK
+        if (packet.name === Commands.SaveConfiguration || packet.name === Commands.ActivateConfig) {
+            sendCommand(Commands.RestartRobot);
+        }
+
         return;
     }
 
@@ -375,6 +380,11 @@ function handleCommand(packet: Command) {
             break;
         case Commands.NotifyActiveConfiguration:
             robot.activeConfiguration = packet.extra;
+
+            if (!robot.configurations.find(cfg => cfg.name === packet.extra.name)) {
+                robot.configurations.push(packet.extra);
+            }
+
             break;
         case Commands.NotifyUserDeviceList:
             let deviceList = {};
