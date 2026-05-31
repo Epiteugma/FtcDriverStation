@@ -43,8 +43,8 @@
 
         if (!config) return;
 
-        let names = [];
-        let children = [];
+        let names = config.children.map(dev => dev.name);
+        let children = [...config.children];
 
         for (let i = 0; i < devices.map.length; i++) {
             let device = devices.map[i];
@@ -100,8 +100,7 @@
                 child.detached = false;
                 if (silentScan) config.children.push(child);
             } else {
-                names.push(config.children[childIndex].name);
-                children.push(config.children[childIndex]);
+                config.children[childIndex].detached = false;
             }
 
             if (device.value === UsbDeviceType.LynxUsb) {
@@ -133,17 +132,14 @@
         let usbModule = config?.children.find(dev => (dev as SerialDevice).serialNumber == response.serialNumber) as SerialDevice | undefined;
         if (!usbModule) return;
 
-        let names: string[] = [];
-        let modules = [];
+        let names = usbModule.children.map(dev => dev.name);
+        let modules = [...usbModule.children];
 
         for (let i = 0; i < response.modules.length; i++) {
             let module = response.modules[i];
             let existing = usbModule.children.find(dev => dev.port == module.moduleAddress);
 
             if (existing) {
-                names.push(existing.name);
-                modules.push(existing);
-
                 existing.detached = false;
                 continue;
             }
