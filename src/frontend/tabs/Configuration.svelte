@@ -2,20 +2,37 @@
     import { onMount } from 'svelte';
     import { Commands, robot, sendCommand } from '../../util/robocol.svelte';
     import HardwareView from '../HardwareView.svelte';
-    import { chooseName, CONTROL_HUB_INTERNAL_ADDRESS, DeviceFlavor, DiscoveredLynxModuleImuType, EXPANSION_HUB_PRODUCT_NUMBER, jsonToXML, SERVO_HUB_PRODUCT_NUMBER, UsbDeviceType, xmlToJSON, type DeviceConfiguration, type DiscoveredLynxModule, type LynxModule, type SerialDevice } from '../../util/configuration';
+    import { chooseName, ConfigFileLocation, CONTROL_HUB_INTERNAL_ADDRESS, DeviceFlavor, DiscoveredLynxModuleImuType, EXPANSION_HUB_PRODUCT_NUMBER, jsonToXML, SERVO_HUB_PRODUCT_NUMBER, UsbDeviceType, validateConfig, xmlToJSON, type DeviceConfiguration, type DiscoveredLynxModule, type LynxModule, type SerialDevice } from '../../util/configuration';
 
     let editing: {
         isDirty: boolean;
+        location: ConfigFileLocation;
         name: string;
+        resourceId?: number;
     } | null = $state(null);
 
     let config: DeviceConfiguration | null = $state(null);
     let children: number[] = $state([]);
 
     let scanning = $state(false);
+    let silentScan = $state(false);
     let discovery: string[] = $state([]);
 
+    let exporting = $state(null);
+
     function onConfigurationReceived(xml: string) {
+        if (exporting) {
+            let a = document.createElement('a');
+            a.download = exporting.name + '.xml';
+            a.href = URL.createObjectURL(new Blob([xml], { type: 'text/xml' }));
+
+            a.click();
+            a.remove();
+
+            exporting = null;
+            return;
+        }
+
         config = xmlToJSON(xml);
         children = [];
     }
@@ -79,6 +96,9 @@
 
                 names.push(child.name);
                 children.push(child);
+
+                child.detached = false;
+                if (silentScan) config.children.push(child);
             } else {
                 names.push(config.children[childIndex].name);
                 children.push(config.children[childIndex]);
@@ -90,12 +110,25 @@
             }
         }
 
-        config.children = children;
+        if (silentScan) {
+            for (let i = 0; i < config.children.length; i++) {
+                let child = config.children[i];
+                if (!children.includes(child)) child.detached = true;
+            }
+        } else {
+            config.children = children;
+        }
     }
 
     function onModuleDiscoveryResponse(response: { serialNumber: string; modules: DiscoveredLynxModule[]; }) {
         discovery.splice(discovery.indexOf(response.serialNumber), 1);
-        if (!discovery.length && !scanning && editing) editing.isDirty = true;
+
+        let isSilent = silentScan;
+
+        if (!discovery.length && !scanning && editing) {
+            if (silentScan) silentScan = false;
+            else editing.isDirty = true;
+        }
 
         let usbModule = config?.children.find(dev => (dev as SerialDevice).serialNumber == response.serialNumber) as SerialDevice | undefined;
         if (!usbModule) return;
@@ -110,6 +143,8 @@
             if (existing) {
                 names.push(existing.name);
                 modules.push(existing);
+
+                existing.detached = false;
                 continue;
             }
 
@@ -139,7 +174,9 @@
                     i2c1: [],
                     i2c2: [],
                     i2c3: [],
-                };
+                } as LynxModule;
+
+                if (module.isParent) usbModule.parentModuleAddress = module.moduleAddress;
 
                 switch (module.imuType) {
                     case DiscoveredLynxModuleImuType.BNO055:
@@ -167,10 +204,19 @@
             if (device) {
                 names.push(device.name);
                 modules.push(device);
+
+                if (isSilent) usbModule.children.push(device);
             }
         }
 
-        usbModule.children = modules;
+        if (isSilent) {
+            for (let i = 0; i < usbModule.children.length; i++) {
+                let module = usbModule.children[i];
+                if (!modules.includes(module)) module.detached = true;
+            }
+        } else {
+            usbModule.children = modules;
+        }
     }
 
     onMount(() => {
@@ -198,6 +244,33 @@
 
         savedDevice = JSON.parse(JSON.stringify(device));
     });
+
+    let importInput: HTMLInputElement | null = $state(null);
+
+    async function importConfig() {
+        let file = importInput!.files![0];
+
+        if (!file) {
+            console.warn('No file.');
+            return;
+        }
+
+        let name = file.name.replace(/\.xml$/, '');
+        let xml = await file.text().catch(() => '');
+
+        if (!validateConfig(xml)) {
+            alert('Failed to parse configuration.');
+            return;
+        }
+
+        let meta = {
+            name,
+            isDirty: true,
+            location: ConfigFileLocation.LocalStorage,
+        };
+
+        sendCommand(Commands.SaveConfiguration, JSON.stringify(meta) + ';' + xml);
+    }
 </script>
 
 {#if editing && config}
@@ -214,8 +287,8 @@
             <button disabled={scanning || !!discovery.length} onclick={() => {
                 if (!confirm('Are you sure you want to scan for devices? Unsaved changed may be lost.')) return;
 
-                sendCommand(Commands.Scan);
                 scanning = true;
+                sendCommand(Commands.Scan);
             }}>{scanning || discovery.length ? 'Scanning' : 'Scan'}</button>
         {:else}
             <button onclick={() => {
@@ -251,20 +324,24 @@
 
     Awaiting configuation from robot controller...
 {:else}
-    <div>
+    <div class="active-config-holder">
         <button onclick={() => {
-            editing = { isDirty: false, name: '' };
+            editing = { isDirty: false, location: ConfigFileLocation.LocalStorage, name: '' };
             config = xmlToJSON('');
+            scanning = true;
 
             sendCommand(Commands.Scan);
-            scanning = true;
         }}>New</button>
-        <span style="margin-left: 10px">Active configuration: {robot.activeConfiguration?.name || 'None'}</span>
+
+        <input type="file" accept=".xml" hidden bind:this={importInput} oninput={importConfig}>
+        <button onclick={() => importInput!.click()}>Import</button>
+
+        <span class="active-config">Active configuration: {robot.activeConfiguration?.name || 'None'}</span>
     </div>
 
     {#each robot.configurations as config, i}
         <div class="config">
-            {config.name}
+            <span class="name">{config.name}</span>
 
             <div class="buttons">
                 <button class="green" onclick={() => {
@@ -272,8 +349,15 @@
                 }}>Activate</button>
                 <button onclick={() => {
                     editing = config;
+                    scanning = silentScan = true;
+
                     sendCommand(Commands.RequestParticularConfiguration, config);
+                    sendCommand(Commands.Scan);
                 }}>Edit</button>
+                <button onclick={() => {
+                    exporting = config;
+                    sendCommand(Commands.RequestParticularConfiguration, config);
+                }}>Export</button>
                 <button class="danger" onclick={() => {
                     if (!confirm('Are you sure that you want to delete ' + config.name + '?')) return;
 
@@ -299,9 +383,12 @@
 
     button {
         width: 75px;
+        padding: 1px 0;
         border-radius: 5px;
         border: none;
         outline: none;
+
+        flex-shrink: 0;
 
         background: var(--primary);
         color: #fff;
@@ -321,10 +408,33 @@
         background: var(--red);
     }
 
+    .buttons {
+        display: flex;
+        gap: 5px;
+    }
+
     .config {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 5px;
+    }
+
+    .config .name {
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: auto;
+    }
+
+    .active-config-holder {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .active-config {
+        text-overflow: ellipsis;
+        overflow: auto;
+        white-space: nowrap;
     }
 </style>

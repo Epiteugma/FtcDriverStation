@@ -101,6 +101,10 @@
                         {/if}
                     </span>
                 {/if}
+
+                {#if (device.xmlTag === 'Robot' || device.xmlTag === 'LynxUsbDevice') && dev.detached}
+                    <span class="detached">(not attached)</span>
+                {/if}
             </span>
             <button onclick={() => children.push(i)}>Configure</button>
         </div>
@@ -136,7 +140,7 @@
     }
 
     button {
-        padding: 0 10px;
+        padding: 1px 10px;
         border-radius: 5px;
         border: none;
         outline: none;
@@ -153,6 +157,7 @@
         display: flex;
         gap: 10px;
         justify-content: space-between;
+        align-items: center;
     }
 
     .eth-tooltip {
@@ -160,7 +165,7 @@
         font-size: 12px;
     }
 
-    .serial-number {
+    .serial-number, .detached {
         color: #777;
         font-size: 12px;
     }

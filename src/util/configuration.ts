@@ -13,12 +13,19 @@ export enum DeviceFlavor {
     EthernetOverUSB = 'ETHERNET_OVER_USB',
 }
 
+export enum ConfigFileLocation {
+    None = 'NONE',
+    LocalStorage = 'LOCAL_STORAGE',
+    Resource = 'RESOURCE',
+}
+
 export interface DeviceConfiguration {
     flavor: DeviceFlavor;
     xmlTag: string;
     name: string;
     children: DeviceConfiguration[];
     port?: number;
+    detached?: boolean;
 }
 
 export interface SerialDevice extends DeviceConfiguration {
@@ -277,6 +284,41 @@ export function jsonToXML(json: DeviceConfiguration) {
     }
 
     return fxb.build(xml);
+}
+
+function validateDevice(parent: DeviceConfiguration, device: DeviceConfiguration) {
+    if (parent.xmlTag === 'Robot') {
+        const topLevelDevices = ['LynxUsbDevice', 'Webcam', 'EthernetDevice'];
+        if (!topLevelDevices.includes(device.xmlTag)) return false;
+
+        let serial = device as SerialDevice;
+        if (!serial.serialNumber) return false;
+
+        if (serial.xmlTag === 'LynxUsbModule' && (
+            serial.parentModuleAddress == undefined ||
+            serial.children.findIndex(dev => dev.port === serial.parentModuleAddress) < 0
+        )) return false;
+
+        return true;
+    }
+
+    if (parent.xmlTag === 'LynxUsbModule') {
+        const lynxChildren = ['LynxModule', 'ServoHub'];
+        if (!lynxChildren.includes(device.xmlTag)) return false;
+    }
+
+    return device.port != undefined;
+}
+
+export function validateConfig(xml: string) {
+    let robot = xmlToJSON(xml);
+    if (!robot.children.length) return false;
+
+    for (let i = 0; i < robot.children.length; i++) {
+        if (!validateDevice(robot, robot.children[i])) return false;
+    }
+
+    return true;
 }
 
 export function chooseName(names: string[], firstChoice: string | undefined, format: string, id = 1) {
