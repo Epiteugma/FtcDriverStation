@@ -22,6 +22,7 @@ export const connection = $state({
         latestData: null,
         needsUpdate: false,
         bindLock: false,
+        keyboard: false,
     },
 
     gamepad2: {
@@ -29,6 +30,7 @@ export const connection = $state({
         latestData: null,
         needsUpdate: false,
         bindLock: false,
+        keyboard: false,
     },
 });
 
