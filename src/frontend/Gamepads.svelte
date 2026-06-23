@@ -27,7 +27,7 @@
         requestAnimationFrame(poll);
 
         let gamepads = navigator.getGamepads();
-        
+
         bind(gamepads);
 
         if (gamepad1.keyboard) updateKeyboard(gamepad1, 1);
@@ -57,11 +57,11 @@
         return v;
     }
 
-    function update(gamepads: globalThis.Gamepad[], gamepad: any) {
-        let data = gamepads[gamepad.index];
-        let packet = gamepad.latestData ? gamepad.latestData as GamepadPacket : new GamepadPacket();
+    function update(gamepads: (globalThis.Gamepad | null)[], gamepad: any) {
+        let data = gamepads[gamepad.index]!;
 
-        let oldPacket = { ...packet };
+        let packet = gamepad.latestData ? gamepad.latestData as GamepadPacket : new GamepadPacket();
+        let oldPacket = { ...packet } as GamepadPacket;
 
         packet.user = gamepad === gamepad1 ? 1 : 2;
         packet.id = gamepad.index;
@@ -75,7 +75,7 @@
         packet.rightBumper = data.buttons[5].pressed;
         packet.leftTrigger = data.buttons[6].value;
         packet.rightTrigger = data.buttons[7].value;
-        
+
         packet.back = data.buttons[8].pressed;
         packet.start = data.buttons[9].pressed;
 
@@ -103,19 +103,13 @@
             else packet.b = false;
         }
 
-        for (let key in packet) {
-            if (packet[key] !== oldPacket[key]) {
-                gamepad.needsUpdate = true;
-                break;
-            }
-        }
-
+        gamepad.needsUpdate = needsUpdate(packet, oldPacket);
         gamepad.latestData = packet;
     }
 
     function updateKeyboard(gamepad: any, user: number) {
-        let oldPacket = gamepad.latestData ? { ...gamepad.latestData as GamepadPacket } : {};
-        let packet = new GamepadPacket();
+        let packet = gamepad.latestData ? gamepad.latestData as GamepadPacket : new GamepadPacket();
+        let oldPacket = { ...packet } as GamepadPacket;
 
         packet.user = user;
         packet.id = GamepadID.Synthetic;
@@ -146,14 +140,18 @@
         packet.dpadLeft = pressedKeys.has('KeyJ');
         packet.dpadRight = pressedKeys.has('KeyL');
 
+        gamepad.needsUpdate = needsUpdate(packet, oldPacket);
+        gamepad.latestData = packet;
+    }
+
+    function needsUpdate(packet: GamepadPacket, oldPacket: GamepadPacket) {
         for (let key in packet) {
             if (packet[key] !== oldPacket[key]) {
-                gamepad.needsUpdate = true;
-                break;
+                return true;
             }
         }
 
-        gamepad.latestData = packet;
+        return false;
     }
 
     function axis(negativeKey: string, positiveKey: string) {
@@ -163,7 +161,7 @@
         return negative + positive;
     }
 
-    function bind(gamepads: globalThis.Gamepad[]) {
+    function bind(gamepads: (globalThis.Gamepad | null)[]) {
         for (let i = 0; i < gamepads.length; i++) {
             let data = gamepads[i];
 
@@ -283,6 +281,7 @@
         height: 22px;
         border: 1px solid #0002;
         border-radius: 5px;
+        outline: none;
         background: #fff8;
         color: #333;
         font-size: 11px;
