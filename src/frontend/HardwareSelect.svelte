@@ -4,10 +4,10 @@
 
     let { flavor = DeviceFlavor.BuiltIn, value = $bindable(''), onchange = null } = $props();
 
-    let devices = $derived(
+    let devices: any[] = $derived(
         Object.values(robot.deviceList)
-            .filter(dev => dev.flavor === flavor)
-            .sort((a, b) => a.name.localeCompare(b.name))
+            .filter((dev: any) => dev.flavor === flavor)
+            .sort((a: any, b: any) => a.name.localeCompare(b.name))
     );
 </script>
 

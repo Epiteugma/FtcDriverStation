@@ -78,6 +78,7 @@ export const popouts = $state({
     stackTrace: null,
     graphing: null,
     fieldView: null,
+    keymap: null,
 });
 
 export const TELEMETRY_SYSTEM_NONE_KEY = '$System$None$';

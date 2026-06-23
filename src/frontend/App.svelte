@@ -37,7 +37,7 @@
     onMount(() => loop());
 </script>
 
-<svelte:window onbeforeunload={(event) => {
+<svelte:window onbeforeunload={() => {
     if (popouts.stackTrace && !popouts.stackTrace.closed) popouts.stackTrace.close();
     if (popouts.graphing && !popouts.graphing.closed) popouts.graphing.close();
     if (popouts.fieldView && !popouts.fieldView.closed) popouts.fieldView.close();

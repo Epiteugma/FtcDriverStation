@@ -1,10 +1,10 @@
 <script lang="ts">
     let { opModes = [], selected = $bindable('') } = $props();
 
-    let sortedOpModes = $derived(opModes ? Array.from(opModes).sort(sortOpModes) : null);
+    let sortedOpModes = $derived(opModes ? Array.from(opModes).sort(sortOpModes) : []);
 
-    let autoOpModes: any[] = $derived(sortedOpModes ? sortedOpModes.filter((o: any) => o.flavor === 'AUTONOMOUS') : null);
-    let teleOpModes: any[] = $derived(sortedOpModes ? sortedOpModes.filter((o: any) => o.flavor === 'TELEOP') : null);
+    let autoOpModes = $derived(sortedOpModes ? sortedOpModes.filter((o: any) => o.flavor === 'AUTONOMOUS') : []);
+    let teleOpModes = $derived(sortedOpModes ? sortedOpModes.filter((o: any) => o.flavor === 'TELEOP') : []);
 
     function sortOpModes(a: any, b: any) {
         return a.group.localeCompare(b.group) || a.name.localeCompare(b.name);
@@ -85,7 +85,7 @@
 
     .arrow {
         pointer-events: none;
-        
+
         width: 25px;
         height: 25px;
         position: relative;
@@ -101,7 +101,7 @@
 
         width: 20px;
         height: 20px;
- 
+
         border-radius: 5px;
         background: var(--primary);
     }

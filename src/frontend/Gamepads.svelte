@@ -1,5 +1,7 @@
 <script lang="ts">
     import GamepadPacket, { GamepadID } from '../librobocol/packets/gamepad';
+    import { getKey, normalizeKey, reloadKeymap } from '../util/keymap';
+    import { popouts } from '../util/robocol.svelte';
     import Gamepad from './Gamepad.svelte';
 
     const DEADZONE = 0.1;
@@ -114,31 +116,27 @@
         packet.user = user;
         packet.id = GamepadID.Synthetic;
 
-        packet.leftStickX = axis('KeyA', 'KeyD');
-        packet.leftStickY = axis('KeyW', 'KeyS');
-        packet.rightStickX = axis('ArrowLeft', 'ArrowRight');
-        packet.rightStickY = axis('ArrowUp', 'ArrowDown');
+        let axes: (keyof typeof packet)[] = ['leftStickX', 'leftStickY', 'rightStickX', 'rightStickY'];
+        let buttons: (keyof typeof packet)[] = [
+            'a', 'b', 'x', 'y',
+            'leftBumper', 'rightBumper',
+            'back', 'start',
+            'leftStickButton', 'rightStickButton',
+            'dpadUp', 'dpadDown', 'dpadLeft', 'dpadRight'
+        ];
 
-        packet.a = pressedKeys.has('Space');
-        packet.b = pressedKeys.has('KeyB');
-        packet.x = pressedKeys.has('KeyX');
-        packet.y = pressedKeys.has('KeyY');
+        for (let i = 0; i < axes.length; i++) {
+            let axisName = axes[i];
+            (packet[axisName] as number) = axis(getKey(axisName + 'Minus'), getKey(axisName + 'Plus'));
+        }
 
-        packet.leftBumper = pressedKeys.has('KeyQ');
-        packet.rightBumper = pressedKeys.has('KeyE');
-        packet.leftTrigger = pressedKeys.has('KeyZ') ? 1 : 0;
-        packet.rightTrigger = pressedKeys.has('KeyC') ? 1 : 0;
+        for (let i = 0; i < buttons.length; i++) {
+            let button = buttons[i];
+            (packet[button] as boolean) = pressedKeys.has(getKey(button));
+        }
 
-        packet.back = pressedKeys.has('Backspace');
-        packet.start = pressedKeys.has('Enter');
-
-        packet.leftStickButton = pressedKeys.has('ShiftLeft') || pressedKeys.has('ShiftRight');
-        packet.rightStickButton = pressedKeys.has('ControlLeft') || pressedKeys.has('ControlRight');
-
-        packet.dpadUp = pressedKeys.has('KeyI');
-        packet.dpadDown = pressedKeys.has('KeyK');
-        packet.dpadLeft = pressedKeys.has('KeyJ');
-        packet.dpadRight = pressedKeys.has('KeyL');
+        packet.leftTrigger = pressedKeys.has(getKey('leftTrigger')) ? 1 : 0;
+        packet.rightTrigger = pressedKeys.has(getKey('rightTrigger')) ? 1 : 0;
 
         gamepad.needsUpdate = needsUpdate(packet, oldPacket);
         gamepad.latestData = packet;
@@ -146,9 +144,8 @@
 
     function needsUpdate(packet: GamepadPacket, oldPacket: GamepadPacket) {
         for (let key in packet) {
-            if (packet[key] !== oldPacket[key]) {
-                return true;
-            }
+            let k = key as keyof GamepadPacket;
+            if (packet[k] !== oldPacket[k]) return true;
         }
 
         return false;
@@ -168,6 +165,8 @@
             if (!data || !data.buttons[9].pressed) continue;
 
             if (data.buttons[0].pressed) {
+                if (gamepad1.keyboard) closeKeymap();
+
                 gamepad1.keyboard = false;
                 gamepad1.index = data.index;
                 gamepad1.bindLock = true;
@@ -177,6 +176,8 @@
                     gamepad2.needsUpdate = true;
                 }
             } else if (data.buttons[1].pressed) {
+                if (gamepad2.keyboard) closeKeymap();
+
                 gamepad2.keyboard = false;
                 gamepad2.index = data.index;
                 gamepad2.bindLock = true;
@@ -189,17 +190,26 @@
         }
     }
 
-    function toggleKeyboard(gamepad: any, user: number) {
+    function toggleKeyboard(gamepad: any) {
         gamepad.keyboard = !gamepad.keyboard;
 
         if (gamepad.keyboard) {
             gamepad.index = GamepadID.Synthetic;
             gamepad.bindLock = false;
 
-            if (user === 1 && gamepad2.keyboard) disableKeyboard(gamepad2);
-            if (user === 2 && gamepad1.keyboard) disableKeyboard(gamepad1);
+            if (gamepad === gamepad1 && gamepad2.keyboard) disableKeyboard(gamepad2);
+            if (gamepad === gamepad2 && gamepad1.keyboard) disableKeyboard(gamepad1);
+
+            if (!popouts.keymap || popouts.keymap.closed) {
+                popouts.keymap = window.open(window.location.href + '?keymap');
+                popouts.keymap.onmessage = (event: MessageEvent) => {
+                    if (event.data.type === 'reloadKeymap') return reloadKeymap();
+                    onKeyEvent(event.data);
+                };
+            }
         } else {
             disableKeyboard(gamepad);
+            closeKeymap();
         }
 
         gamepad.needsUpdate = true;
@@ -212,20 +222,19 @@
         gamepad.needsUpdate = true;
     }
 
-    function onKeydown(event: KeyboardEvent) {
-        if (isTypingTarget(event.target)) return;
-
-        if (isKeyboardCode(event.code)) {
-            event.preventDefault();
-            pressedKeys.add(event.code);
-        }
+    function closeKeymap() {
+        popouts.keymap?.close();
+        popouts.keymap = null;
     }
 
-    function onKeyup(event: KeyboardEvent) {
-        if (isKeyboardCode(event.code)) {
-            event.preventDefault();
-            pressedKeys.delete(event.code);
-        }
+    function onKeyEvent(event: KeyboardEvent) {
+        if (isTypingTarget(event.target)) return;
+
+        let isDown = event.type === 'keydown';
+        let normalizedKey = normalizeKey(event.key);
+
+        if (isDown) pressedKeys.add(normalizedKey);
+        else pressedKeys.delete(normalizedKey);
     }
 
     function isTypingTarget(target: EventTarget | null) {
@@ -235,37 +244,14 @@
             target instanceof HTMLElement && target.isContentEditable;
     }
 
-    function isKeyboardCode(code: string) {
-        return [
-            'KeyW', 'KeyA', 'KeyS', 'KeyD',
-            'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-            'Space', 'KeyB', 'KeyX', 'KeyY',
-            'KeyQ', 'KeyE', 'KeyZ', 'KeyC',
-            'Backspace', 'Enter',
-            'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight',
-            'KeyI', 'KeyJ', 'KeyK', 'KeyL',
-        ].includes(code);
-    }
-
     poll();
 </script>
 
-<svelte:window onkeydown={onKeydown} onkeyup={onKeyup} />
+<svelte:window onkeydown={onKeyEvent} onkeyup={onKeyEvent} />
 
 <div class="gamepads">
-    {#key gamepad1.needsUpdate}<Gamepad style={gamepad1.index === -1 ? 'opacity: 0.5' : 'animation: gamepad-glow 1s'} />{/key}
-    <button
-        class:active={gamepad1.keyboard}
-        onclick={() => toggleKeyboard(gamepad1, 1)}
-        title="Keyboard gamepad 1: WASD left stick, arrows right stick, Space/A, B, X, Y, Q/E bumpers, Z/C triggers, Enter start, Backspace back, IJKL dpad"
-    >K1</button>
-
-    {#key gamepad2.needsUpdate}<Gamepad style={gamepad2.index === -1 ? 'opacity: 0.5' : 'animation: gamepad-glow 1s'} />{/key}
-    <button
-        class:active={gamepad2.keyboard}
-        onclick={() => toggleKeyboard(gamepad2, 2)}
-        title="Keyboard gamepad 2: WASD left stick, arrows right stick, Space/A, B, X, Y, Q/E bumpers, Z/C triggers, Enter start, Backspace back, IJKL dpad"
-    >K2</button>
+    {#key gamepad1.needsUpdate}<Gamepad bind:keyboard={gamepad1.keyboard} onclick={() => toggleKeyboard(gamepad1)} style={gamepad1.index === -1 ? 'opacity: 0.5' : 'animation: gamepad-glow 1s'} />{/key}
+    {#key gamepad2.needsUpdate}<Gamepad bind:keyboard={gamepad2.keyboard} onclick={() => toggleKeyboard(gamepad2)} style={gamepad2.index === -1 ? 'opacity: 0.5' : 'animation: gamepad-glow 1s'} />{/key}
 </div>
 
 <style>
@@ -273,24 +259,5 @@
         display: flex;
         gap: 6px;
         align-items: center;
-    }
-
-    button {
-        -webkit-app-region: no-drag;
-        width: 30px;
-        height: 22px;
-        border: 1px solid #0002;
-        border-radius: 5px;
-        outline: none;
-        background: #fff8;
-        color: #333;
-        font-size: 11px;
-        font-weight: 600;
-    }
-
-    button.active {
-        border-color: var(--green);
-        background: #dff6df;
-        color: var(--green);
     }
 </style>

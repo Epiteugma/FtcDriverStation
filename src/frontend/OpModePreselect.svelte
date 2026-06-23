@@ -1,8 +1,8 @@
 <script lang="ts">
     let { opModes = [], disabled = false, selected = $bindable('') } = $props();
 
-    let sortedOpModes = $derived(opModes ? Array.from(opModes).sort(sortOpModes) : null);
-    let teleOpModes: any[] = $derived(sortedOpModes ? sortedOpModes.filter((o: any) => o.flavor === 'TELEOP') : null);
+    let sortedOpModes = $derived(opModes ? Array.from(opModes).sort(sortOpModes) : []);
+    let teleOpModes = $derived(sortedOpModes ? sortedOpModes.filter((o: any) => o.flavor === 'TELEOP') : []);
 
     function sortOpModes(a: any, b: any) {
         return a.group.localeCompare(b.group) || a.name.localeCompare(b.name);

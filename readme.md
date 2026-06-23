@@ -7,7 +7,7 @@ It can be used without installation of any additional software on the robot, as 
 
 ## Developing the app
 
-Prerequisites: you must have [NodeJS](https://nodejs.org/ens) installed
+Prerequisites: you must have [NodeJS](https://nodejs.org/) installed
 
 - Clone the repository with `--recurse-submodules`
 - Run `npm install` to download project dependencies
