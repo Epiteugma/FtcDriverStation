@@ -1,6 +1,7 @@
 <script lang="ts">
     import GamepadPacket, { GamepadID } from '../librobocol/packets/gamepad';
     import Gamepad from './Gamepad.svelte';
+    import { normalize, debugLog } from '../util/gamepadNormalize';
 
     const DEADZONE = 0.1;
 
@@ -23,10 +24,16 @@
 
     const pressedKeys = new Set<string>();
 
+    // Raw gamepad debug logging: env FTCDS_GAMEPAD_DEBUG=1 (via preload) or toggle with Ctrl+Shift+G (persisted)
+    let gamepadDebug = !!(window as any).robocol?.gamepadDebug || localStorage.getItem('ftcdsGamepadDebug') === '1';
+    let ids = $state({ 1: '', 2: '' });
+
     function poll() {
         requestAnimationFrame(poll);
 
         let gamepads = navigator.getGamepads();
+
+        if (gamepadDebug) for (const g of gamepads) debugLog(g);
 
         bind(gamepads);
 
@@ -58,7 +65,8 @@
     }
 
     function update(gamepads: (globalThis.Gamepad | null)[], gamepad: any) {
-        let data = gamepads[gamepad.index]!;
+        let data = normalize(gamepads[gamepad.index]!);
+        ids[gamepad === gamepad1 ? 1 : 2] = `${data.id} [${data.mapping || 'no mapping'} -> ${data.layout}]`;
 
         let packet = gamepad.latestData ? gamepad.latestData as GamepadPacket : new GamepadPacket();
         let oldPacket = { ...packet } as GamepadPacket;
@@ -163,9 +171,10 @@
 
     function bind(gamepads: (globalThis.Gamepad | null)[]) {
         for (let i = 0; i < gamepads.length; i++) {
-            let data = gamepads[i];
+            if (!gamepads[i]) continue;
+            let data = normalize(gamepads[i]!);
 
-            if (!data || !data.buttons[9].pressed) continue;
+            if (!data.buttons[9].pressed) continue;
 
             if (data.buttons[0].pressed) {
                 gamepad1.keyboard = false;
@@ -213,6 +222,13 @@
     }
 
     function onKeydown(event: KeyboardEvent) {
+        if (event.ctrlKey && event.shiftKey && event.code === 'KeyG') {
+            gamepadDebug = !gamepadDebug;
+            localStorage.setItem('ftcdsGamepadDebug', gamepadDebug ? '1' : '0');
+            console.log('[gamepad-debug]', gamepadDebug ? 'enabled' : 'disabled');
+            return;
+        }
+
         if (isTypingTarget(event.target)) return;
 
         if (isKeyboardCode(event.code)) {
@@ -253,14 +269,14 @@
 <svelte:window onkeydown={onKeydown} onkeyup={onKeyup} />
 
 <div class="gamepads">
-    {#key gamepad1.needsUpdate}<Gamepad style={gamepad1.index === -1 ? 'opacity: 0.5' : 'animation: gamepad-glow 1s'} />{/key}
+    <span title={gamepad1.index >= 0 && !gamepad1.keyboard ? `Gamepad 1: ${ids[1]}` : 'Gamepad 1: press Start+A (Options+Cross) to bind'}>{#key gamepad1.needsUpdate}<Gamepad style={gamepad1.index === -1 ? 'opacity: 0.5' : 'animation: gamepad-glow 1s'} />{/key}</span>
     <button
         class:active={gamepad1.keyboard}
         onclick={() => toggleKeyboard(gamepad1, 1)}
         title="Keyboard gamepad 1: WASD left stick, arrows right stick, Space/A, B, X, Y, Q/E bumpers, Z/C triggers, Enter start, Backspace back, IJKL dpad"
     >K1</button>
 
-    {#key gamepad2.needsUpdate}<Gamepad style={gamepad2.index === -1 ? 'opacity: 0.5' : 'animation: gamepad-glow 1s'} />{/key}
+    <span title={gamepad2.index >= 0 && !gamepad2.keyboard ? `Gamepad 2: ${ids[2]}` : 'Gamepad 2: press Start+B (Options+Circle) to bind'}>{#key gamepad2.needsUpdate}<Gamepad style={gamepad2.index === -1 ? 'opacity: 0.5' : 'animation: gamepad-glow 1s'} />{/key}</span>
     <button
         class:active={gamepad2.keyboard}
         onclick={() => toggleKeyboard(gamepad2, 2)}
@@ -273,6 +289,11 @@
         display: flex;
         gap: 6px;
         align-items: center;
+    }
+
+    .gamepads > span {
+        display: flex;
+        -webkit-app-region: no-drag;
     }
 
     button {

@@ -9,6 +9,7 @@ export function onPacket(listener: (packet: ArrayBuffer, from: string) => any) {
 }
 
 contextBridge.exposeInMainWorld('robocol', {
+    gamepadDebug: (() => { try { return process.env.FTCDS_GAMEPAD_DEBUG === '1'; } catch { return false; } })(),
     sendPacket,
     onPacket,
 });
