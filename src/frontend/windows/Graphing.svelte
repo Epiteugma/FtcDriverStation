@@ -36,6 +36,8 @@
     };
 
     let datasets = $state([]);
+    // remember checkbox/colour per key so a cleared or temporarily missing series comes back selected
+    const remembered: { [key: string]: { enabled: boolean; color: string } } = {};
 
     let pausedTime = $state(null);
     let lineWidth = 1;
@@ -155,6 +157,7 @@
             }
 
             if (!set.data.length) {
+                remembered[set.key] = { enabled: set.enabled, color: set.color };
                 datasets.splice(i, 1);
                 i--;
             }
@@ -163,8 +166,8 @@
         for (let key in data) {
             datasets.push({
                 key,
-                enabled: false,
-                color: DEFAULT_SET_COLORS[datasets.length % DEFAULT_SET_COLORS.length],
+                enabled: remembered[key]?.enabled ?? false,
+                color: remembered[key]?.color ?? DEFAULT_SET_COLORS[datasets.length % DEFAULT_SET_COLORS.length],
                 data: [{ time, value: data[key] }]
             });
         }
