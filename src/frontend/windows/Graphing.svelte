@@ -10,8 +10,13 @@
         left: 60,
         right: 0,
         top: 0,
-        bottom: 10,
+        bottom: 42, // room for time tick labels + 't (s)' axis label
     };
+
+    // Time axis origin: first sample after window open / last clear (ms epoch)
+    let startTime: number | null = null;
+    const TIME_TICK_STEPS = [0.5, 1, 2, 5, 10, 15, 30, 60];
+    const MIN_TICK_SPACING_PX = 60;
 
     let square = {
         width: 20,
@@ -112,6 +117,7 @@
     function processTelemetry(telemetry: Telemetry) {        
         let data: { [key: string]: number; } = {};
         let time = Date.now();
+        if (startTime === null) startTime = time;
 
         for (let [key, value] of telemetry.dataStrings) {
             if (key.startsWith('$') && key.endsWith('$')) continue;
@@ -276,6 +282,8 @@
             label(x, outerBounds.y + outerBounds.height, i, true);
         }
 
+        drawTimeAxis(innerBounds);
+
         for (let i = 0; i < datasets.length; i++) {
             let set = datasets[i];
             let last: { x: number; y: number; };
@@ -364,7 +372,8 @@
             });
         }
 
-        tooltip.time = new Date(time).toLocaleTimeString('en-US', { hour12: false });
+        tooltip.time = new Date(time).toLocaleTimeString('en-US', { hour12: false }) +
+            (startTime !== null ? ` (t = ${((time - startTime) / 1000).toFixed(2)} s)` : '');
         tooltip.points = points;
     }
 
@@ -488,6 +497,47 @@
         ctx.fillText(n % 1 == 0 ? n + '' : n.toFixed(2), x - 5, y + (isX ? 0 : 1));
     }
 
+    function formatSeconds(t: number, step: number) {
+        return (step < 1 ? t.toFixed(1) : Math.round(t).toString()) + 's';
+    }
+
+    // x-axis: seconds since startTime. Right edge = now (or pause moment), left edge = right - visible window.
+    function drawTimeAxis(innerBounds: { x: number; y: number; width: number; height: number; }) {
+        let pxPerSecond = square.width * 1000 / scale.time;
+        let step = TIME_TICK_STEPS.find(s => s * pxPerSecond >= MIN_TICK_SPACING_PX) ?? 60;
+        let axisY = innerBounds.y + innerBounds.height;
+
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'black';
+        ctx.fillRect(innerBounds.x, axisY, innerBounds.width, lineWidth);
+
+        ctx.font = '13px Poppins';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+
+        if (startTime !== null) {
+            let right = ((pausedTime ?? Date.now()) - startTime) / 1000;
+            let left = right - innerBounds.width / pxPerSecond;
+
+            for (let t = Math.max(0, Math.ceil(left / step) * step); t <= right + 1e-9; t += step) {
+                let x = innerBounds.x + innerBounds.width - (right - t) * pxPerSecond;
+                ctx.fillRect(x, axisY, lineWidth, 6);
+
+                // keep edge labels inside the canvas
+                let label = formatSeconds(t, step);
+                let w = ctx.measureText(label).width;
+                let lx = Math.min(Math.max(x, innerBounds.x + w / 2), innerBounds.x + innerBounds.width - w / 2);
+                ctx.fillText(label, lx, axisY + 8);
+            }
+        }
+
+        ctx.textAlign = 'right';
+        ctx.font = 'italic 13px Poppins';
+        ctx.fillText('t (s)', innerBounds.x + innerBounds.width, axisY + 25);
+        ctx.restore();
+    }
+
     function lineStyle(i: number, isVertical = false) {
         ctx.globalAlpha = !i ? 1 : i % 10 == 0 ? 0.5 : 0.3;
     }
@@ -499,7 +549,7 @@
     function exportDatasets() {
         if (!hasData()) return;
 
-        let rows = [['timestamp']];
+        let rows = [['timestamp', 't_s']];
         let timestamped = {};
         let timestamps = [];
 
@@ -520,12 +570,13 @@
         }
 
         timestamps.sort((a, b) => a - b);
+        let origin = startTime ?? timestamps[0];
 
         for (let i = 0; i < timestamps.length; i++) {
             let time = timestamps[i];
             let data = timestamped[time];
 
-            let row = [time];
+            let row = [time, ((time - origin) / 1000).toFixed(3)];
 
             for (let j = 0; j < datasets.length; j++) {
                 if (!(j in data)) row.push('');
@@ -614,6 +665,7 @@
         <svg class="clear {hasData() ? '' : 'disabled'}" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" onclick={() => {
             for (let i = 0; i < datasets.length; i++) datasets[i].data = [];
             tooltip.points = [];
+            startTime = pausedTime = null; // time axis restarts at 0 with the next sample
         }}>
             <path d="M690-240h190v80H610l80-80Zm-500 80-85-85q-23-23-23.5-57t22.5-58l440-456q23-24 56.5-24t56.5 23l199 199q23 23 23 57t-23 57L520-160H190Z"/>
         </svg>
