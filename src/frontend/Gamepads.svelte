@@ -2,6 +2,7 @@
     import GamepadPacket, { GamepadID } from '../librobocol/packets/gamepad';
     import Gamepad from './Gamepad.svelte';
     import { normalize, debugLog } from '../util/gamepadNormalize';
+    import { rumble } from '../util/robocol.svelte';
 
     const DEADZONE = 0.1;
 
@@ -177,6 +178,7 @@
             if (!data.buttons[9].pressed) continue;
 
             if (data.buttons[0].pressed) {
+                if (gamepad1.index !== data.index || gamepad1.keyboard) onBound(1);
                 gamepad1.keyboard = false;
                 gamepad1.index = data.index;
                 gamepad1.bindLock = true;
@@ -186,6 +188,7 @@
                     gamepad2.needsUpdate = true;
                 }
             } else if (data.buttons[1].pressed) {
+                if (gamepad2.index !== data.index || gamepad2.keyboard) onBound(2);
                 gamepad2.keyboard = false;
                 gamepad2.index = data.index;
                 gamepad2.bindLock = true;
@@ -196,6 +199,11 @@
                 }
             }
         }
+    }
+
+    function onBound(user: number) {
+        // short confirmation rumble once the slot points at the new pad
+        setTimeout(() => rumble.pulse(user, 250), 0);
     }
 
     function toggleKeyboard(gamepad: any, user: number) {
