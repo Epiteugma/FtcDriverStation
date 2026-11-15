@@ -2,7 +2,8 @@
     import GamepadPacket, { GamepadID } from '../librobocol/packets/gamepad';
     import Gamepad from './Gamepad.svelte';
     import { normalize, debugLog } from '../util/gamepadNormalize';
-    import { rumble } from '../util/robocol.svelte';
+    import { showNotice, rumble } from '../util/robocol.svelte';
+    import { gamepadDisplayName } from '../util/rumble';
 
     const DEADZONE = 0.1;
 
@@ -44,6 +45,7 @@
             else {
                 gamepad1.index = -1;
                 gamepad1.needsUpdate = true;
+                showNotice('Gamepad 1 disconnected');
             }
         }
 
@@ -53,6 +55,7 @@
             else {
                 gamepad2.index = -1;
                 gamepad2.needsUpdate = true;
+                showNotice('Gamepad 2 disconnected');
             }
         }
     }
@@ -178,7 +181,7 @@
             if (!data.buttons[9].pressed) continue;
 
             if (data.buttons[0].pressed) {
-                if (gamepad1.index !== data.index || gamepad1.keyboard) onBound(1);
+                if (gamepad1.index !== data.index || gamepad1.keyboard) onBound(1, data.id);
                 gamepad1.keyboard = false;
                 gamepad1.index = data.index;
                 gamepad1.bindLock = true;
@@ -188,7 +191,7 @@
                     gamepad2.needsUpdate = true;
                 }
             } else if (data.buttons[1].pressed) {
-                if (gamepad2.index !== data.index || gamepad2.keyboard) onBound(2);
+                if (gamepad2.index !== data.index || gamepad2.keyboard) onBound(2, data.id);
                 gamepad2.keyboard = false;
                 gamepad2.index = data.index;
                 gamepad2.bindLock = true;
@@ -201,7 +204,8 @@
         }
     }
 
-    function onBound(user: number) {
+    function onBound(user: number, id: string) {
+        showNotice(`Gamepad ${user} connected: ${gamepadDisplayName(id)}`);
         // short confirmation rumble once the slot points at the new pad
         setTimeout(() => rumble.pulse(user, 250), 0);
     }
@@ -219,6 +223,7 @@
             disableKeyboard(gamepad);
         }
 
+        showNotice(`Gamepad ${user}: keyboard (K${user}) ${gamepad.keyboard ? 'enabled' : 'disabled'}`);
         gamepad.needsUpdate = true;
     }
 

@@ -2,7 +2,7 @@
     import OpModeSelector from '../OpModeSelector.svelte';
     import OpModePreselect from '../OpModePreselect.svelte';
     import Slider from '../Slider.svelte';
-    import { sendCommand, robot, robotControl, popouts, DEFAULT_OP_MODE_NAME, Commands, TELEMETRY_SYSTEM_NONE_KEY, TELEMETRY_SYSTEM_WARNING_KEY, OpModeState } from '../../util/robocol.svelte';
+    import { sendCommand, robot, robotControl, popouts, notice, DEFAULT_OP_MODE_NAME, Commands, TELEMETRY_SYSTEM_NONE_KEY, TELEMETRY_SYSTEM_WARNING_KEY, OpModeState } from '../../util/robocol.svelte';
     import { RobotState } from '../../librobocol/types';
 
     let systemTelemetry = $derived.by(() => {
@@ -104,6 +104,9 @@
 </h2>
 
 <div class="telemetry">
+    {#if notice.text}
+        {#key notice.id}<div class="notice">{notice.text}</div>{/key}
+    {/if}
     <pre><span
         style="font-weight: bold; color: {robot.systemTelemetry?.tag === TELEMETRY_SYSTEM_WARNING_KEY ? 'var(--orange)' : 'var(--red)'}"
     >{systemTelemetry}</span>{userTelemetry}</pre>
@@ -166,9 +169,28 @@
         fill: var(--primary);
     }
 
+    .notice {
+        flex: none;
+
+        padding: 6px 10px;
+        background: #e6f6e6;
+        border-bottom: 1px solid var(--green);
+        color: #060;
+        font-weight: bold;
+
+        animation: notice-fade 4s forwards;
+    }
+
+    @keyframes notice-fade {
+        0% { opacity: 0; transform: translateY(-4px); }
+        5%, 85% { opacity: 1; transform: none; }
+        100% { opacity: 0; }
+    }
+
     .telemetry {
         position: relative;
         display: flex;
+        flex-direction: column;
         flex: 1;
 
         border-radius: 10px;

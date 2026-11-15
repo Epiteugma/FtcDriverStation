@@ -75,6 +75,17 @@ export const robotControl = $state({
     },
 });
 
+// Transient notice shown at the top of the telemetry panel (gamepad bind/unbind, keyboard toggles)
+export const notice = $state({ text: '', id: 0 });
+let noticeTimer: any = null;
+
+export function showNotice(text: string, ms = 4000) {
+    notice.text = text;
+    notice.id++;
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => (notice.text = ''), ms);
+}
+
 const rumbleDebug = !!(window as any).robocol?.rumbleDebug;
 const rumbleLog = (...args: any[]) => { if (rumbleDebug) console.log('[rumble]', ...args); };
 
