@@ -308,6 +308,9 @@ function handleTelemetry(packet: Telemetry) {
         robot.batteryLevel = batteryLevel === NO_VOLTAGE_SENSOR_KEY ? 0 : (parseFloat(batteryLevel) || 0);
     }
 
+    // SDK sends standalone battery packets (tag == key) on every command; don't let them blank the user telemetry view
+    if (packet.tag === BATTERY_LEVEL_KEY) return;
+
     robot.telemetry = packet;
 
     if (popouts.graphing && !popouts.graphing.closed) popouts.graphing.postMessage(packet);
