@@ -200,7 +200,7 @@ export function loop() {
             heartbeat.seqNum = ++connection.seqNum;
             heartbeat.timestamp = BigInt(Date.now()) * 1000000n;
             heartbeat.t0 = BigInt(Date.now());
-            heartbeat.timezoneId = 'GMT';
+            heartbeat.timezoneId = Intl.DateTimeFormat().resolvedOptions().timeZone || 'GMT';
 
             window.robocol.sendPacket(heartbeat.serialize().buffer, connection.remote);
         } else {
@@ -307,6 +307,9 @@ function handleTelemetry(packet: Telemetry) {
         let batteryLevel = packet.dataStrings.get(BATTERY_LEVEL_KEY);
         robot.batteryLevel = batteryLevel === NO_VOLTAGE_SENSOR_KEY ? 0 : (parseFloat(batteryLevel) || 0);
     }
+
+    // SDK sends standalone battery packets (tag == key) on every command; don't let them blank the user telemetry view
+    if (packet.tag === BATTERY_LEVEL_KEY) return;
 
     robot.telemetry = packet;
 
