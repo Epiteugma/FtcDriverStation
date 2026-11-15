@@ -36,6 +36,13 @@
     };
 
     let datasets = $state([]);
+
+    // y-axis mode: own auto-scaled axis per selected series (default) or one shared axis
+    let ownAxes = $state(true);
+    const AXIS_WIDTH = 62; // px per extra right-hand axis
+    type YScale = { min: number; step: number; };
+    let setScales = new Map<string, YScale>(); // per-series scale for the current frame
+    let rightAxes: { key: string; color: string; }[] = []; // extra axes (2nd, 3rd, ... series) on the right
     // remember checkbox/colour per key so a cleared or temporarily missing series comes back selected
     const remembered: { [key: string]: { enabled: boolean; color: string } } = {};
 
@@ -184,34 +191,74 @@
         }
     }
 
-    function updateScale(graphWidth: number, horizontalLines: number) {
+    function visibleRange(set: any, graphWidth: number) {
         let max = null;
         let min = null;
-        
-        for (let i = 0; i < datasets.length; i++) {
-            let set = datasets[i];
 
-            if (!set.enabled) continue;
+        for (let j = 0; j < set.data.length; j++) {
+            let { value, time } = set.data[j];
+            let x = ((pausedTime ?? Date.now()) - time) / scale.time * square.width;
 
-            for (let j = 0; j < set.data.length; j++) {
-                let { value, time } = set.data[j];
-                let x = ((pausedTime ?? Date.now()) - time) / scale.time * square.width;
+            if (x < 0 || x > graphWidth) continue;
 
-                if (x < 0 || x > graphWidth) continue;
-
-                if (max === null || value > max) max = value;
-                if (min === null || value < min) min = value;
-            }
-
+            if (max === null || value > max) max = value;
+            if (min === null || value < min) min = value;
         }
 
+        return min === null ? null : { min, max };
+    }
+
+    function toScale(min: number, max: number, horizontalLines: number): YScale {
         let range = max - min;
+        if (!(range > 0)) { // flat line: give it some room instead of dividing by zero
+            range = Math.abs(min) * 0.1 || 1;
+            min -= range / 2;
+            max += range / 2;
+        }
 
-        min -= range * 0.05;
-        max += range * 0.05;
+        return { min: min - range * 0.05, step: range * 1.1 / horizontalLines };
+    }
 
-        scale.min = min;
-        scale.step = range * 1.1 / horizontalLines;
+    function enabledSets() {
+        return datasets.filter(set => set.enabled && set.data.length);
+    }
+
+    function isMultiAxis() {
+        return ownAxes && enabledSets().length >= 2;
+    }
+
+    function updateScale(graphWidth: number, horizontalLines: number) {
+        setScales = new Map();
+        let sets = enabledSets();
+        let ranges = sets.map(set => visibleRange(set, graphWidth));
+
+        if (isMultiAxis()) {
+            sets.forEach((set, i) => {
+                let r = ranges[i] ?? { min: -1, max: 1 };
+                setScales.set(set.key, toScale(r.min, r.max, horizontalLines));
+            });
+
+            let first = setScales.get(sets[0].key)!;
+            scale.min = first.min;
+            scale.step = first.step;
+            return;
+        }
+
+        let min = null, max = null;
+        for (let r of ranges) {
+            if (!r) continue;
+            if (min === null || r.min < min) min = r.min;
+            if (max === null || r.max > max) max = r.max;
+        }
+
+        let shared = min === null ? { min: -1, step: 2.2 / horizontalLines } : toScale(min, max, horizontalLines);
+        scale.min = shared.min;
+        scale.step = shared.step;
+        for (let set of sets) setScales.set(set.key, shared);
+    }
+
+    function scaleFor(set: any): YScale {
+        return setScales.get(set.key) ?? scale;
     }
 
     function resize() {
@@ -225,6 +272,13 @@
         requestAnimationFrame(draw);
         ctx.clearRect(0, 0, graph.width, graph.height);
         ctx.fillStyle = 'black';
+
+        // reserve room on the right for the extra y-axes
+        let multi = isMultiAxis();
+        let sets = enabledSets();
+        rightAxes = multi ? sets.slice(1).map(set => ({ key: set.key, color: set.color })) : [];
+        padding.right = rightAxes.length * AXIS_WIDTH;
+        let leftColor = multi ? sets[0].color : 'black';
 
         let outerBounds = {
             x: padding.left,
@@ -262,8 +316,29 @@
                 lineWidth
             );
 
-            label(outerBounds.x, y, i);
+            label(outerBounds.x, y, i, false, multi ? scaleFor(sets[0]) : scale, leftColor);
+
+            for (let k = 0; k < rightAxes.length; k++) {
+                let ax = innerBounds.x + innerBounds.width + k * AXIS_WIDTH;
+                let sc = setScales.get(rightAxes[k].key) ?? scale;
+
+                markerStyle(i);
+                ctx.fillStyle = rightAxes[k].color;
+                ctx.fillRect(ax, y, 6, lineWidth);
+                rightLabel(ax + 8, y, i, sc, rightAxes[k].color);
+                ctx.fillStyle = 'black';
+            }
         }
+
+        // axis spines, coloured like their series in multi-axis mode
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = leftColor;
+        ctx.fillRect(innerBounds.x - 1, innerBounds.y, 2, innerBounds.height);
+        for (let k = 0; k < rightAxes.length; k++) {
+            ctx.fillStyle = rightAxes[k].color;
+            ctx.fillRect(innerBounds.x + innerBounds.width + k * AXIS_WIDTH, innerBounds.y, 2, innerBounds.height);
+        }
+        ctx.fillStyle = 'black';
 
         for (let i = 0; i < verticalLines; i++) {
             let x = innerBounds.x + square.width * i;
@@ -297,7 +372,7 @@
                 if (!j) ctx.beginPath();
 
                 let point = set.data[j % set.data.length];
-                last = plot(point, last, innerBounds);
+                last = plot(point, last, innerBounds, scaleFor(set));
 
                 if (j == set.data.length - 1) {
                     ctx.strokeStyle = set.color;
@@ -318,7 +393,7 @@
                     let point = tooltip.points[i];
                     let data = datasets[point.set].data[point.index];
 
-                    plotPoint(data, innerBounds, datasets[point.set].color);
+                    plotPoint(data, innerBounds, datasets[point.set].color, scaleFor(datasets[point.set]));
                 }
             }
         }
@@ -400,11 +475,11 @@
         y: number;
         width: number;
         height: number;
-    }, color: string) {
+    }, color: string, sc: YScale = scale) {
         let elapsed = ((pausedTime ?? Date.now()) - point.time) / scale.time;
 
         let x = innerBounds.x + innerBounds.width - elapsed * square.width;
-        let y = innerBounds.y + innerBounds.height - (point.value - scale.min) / scale.step * square.height;
+        let y = innerBounds.y + innerBounds.height - (point.value - sc.min) / sc.step * square.height;
 
         let oob = 
             innerBounds.x > x || x > innerBounds.x + innerBounds.width ||
@@ -436,11 +511,11 @@
         y: number;
         width: number;
         height: number;
-    }) {
+    }, sc: YScale = scale) {
         let elapsed = ((pausedTime ?? Date.now()) - point.time) / scale.time;
 
         let x = innerBounds.x + innerBounds.width - elapsed * square.width;
-        let y = innerBounds.y + innerBounds.height - (point.value - scale.min) / scale.step * square.height;
+        let y = innerBounds.y + innerBounds.height - (point.value - sc.min) / sc.step * square.height;
 
         let oob = 
             innerBounds.x > x || x > innerBounds.x + innerBounds.width ||
@@ -486,18 +561,41 @@
         return { x, y };
     }
 
-    function label(x: number, y: number, i: number, isX = false) {
+    function formatValue(n: number, step: number) {
+        if (n % 1 == 0) return n + '';
+        let decimals = Math.min(3, Math.max(0, 1 - Math.floor(Math.log10(Math.abs(step * 2) || 1))));
+        return n.toFixed(decimals);
+    }
+
+    function label(x: number, y: number, i: number, isX = false, sc: YScale = scale, color = 'black') {
         if (isX && !marker.vertical) return;
         if (!isX && !marker.horizontal) return;
         if (i % 2 != 0) return;
         
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = color;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
-        ctx.font = '14px Poppins';
+        ctx.font = '13px Poppins';
 
-        let n = i * scale.step + scale.min;
+        let n = i * sc.step + sc.min;
 
-        ctx.fillText(n % 1 == 0 ? n + '' : n.toFixed(2), x - 5, y + (isX ? 0 : 1));
+        ctx.fillText(formatValue(n, sc.step), x - 5, y + (isX ? 0 : 1));
+        ctx.restore();
+    }
+
+    function rightLabel(x: number, y: number, i: number, sc: YScale, color: string) {
+        if (i % 2 != 0) return;
+
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = color;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.font = '13px Poppins';
+        ctx.fillText(formatValue(i * sc.step + sc.min, sc.step), x, y + 1);
+        ctx.restore();
     }
 
     function formatSeconds(t: number, step: number) {
@@ -649,6 +747,10 @@
     </div>
 
     <div class="controls-holder">
+        <div class="axis-toggle" title="With 2+ selected series, each series gets its own auto-scaled y-axis">
+            <button class:active={!ownAxes} onclick={() => (ownAxes = false)}>Shared y-axis</button>
+            <button class:active={ownAxes} onclick={() => (ownAxes = true)}>Separate y-axis per series</button>
+        </div>
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <svg class="pause" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" onclick={() => (pausedTime = pausedTime ? null : Date.now())}>
@@ -706,6 +808,28 @@
         padding: 15px;
 
         overflow: auto;
+    }
+
+    .axis-toggle {
+        display: flex;
+        margin-right: auto;
+        border: 1px solid #0003;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .axis-toggle button {
+        border: none;
+        background: #fff;
+        padding: 4px 10px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+    }
+
+    .axis-toggle button.active {
+        background: #6a3df5;
+        color: #fff;
     }
 
     .controls-holder {
