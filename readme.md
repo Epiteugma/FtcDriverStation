@@ -29,3 +29,19 @@ Use the `K1` or `K2` button in the status bar to assign the keyboard to driver s
 | Start / back | `Enter`, `Backspace` |
 | Left / right stick button | `Shift`, `Control` |
 | D-pad | `I`, `J`, `K`, `L` |
+
+## Gamepads
+
+Press `Start` + `A` to bind a gamepad as gamepad 1, or `Start` + `B` for gamepad 2 (on PlayStation-style pads: `Options` + `Cross` / `Options` + `Circle`).
+Controllers that Chromium does not map to the standard layout (gamepad mapping `""`) are normalized when they use the DS4-style generic HID layout, e.g. the ZEROPLUS P4 Wired Gamepad (`0c12:2e18`) on Linux with `hid-generic`.
+Hover the gamepad icon to see which controller is bound and which layout was detected.
+
+Rumble effects from the robot (`gamepad1.rumble(...)` etc.) use the browser vibration API when the controller supports it.
+On Linux, DS4-layout controllers without kernel force feedback are driven directly through `/dev/hidrawN`; this needs read/write access to that device, for example with a udev rule:
+
+```
+# /etc/udev/rules.d/70-ftc-ds-gamepad.rules  (example for the ZEROPLUS P4)
+KERNEL=="hidraw*", ATTRS{idVendor}=="0c12", ATTRS{idProduct}=="2e18", TAG+="uaccess"
+```
+
+Debugging: start the app with `FTCDS_GAMEPAD_DEBUG=1` (or press `Ctrl+Shift+G`) to log raw gamepad input, and `FTCDS_RUMBLE_DEBUG=1` to log rumble output.

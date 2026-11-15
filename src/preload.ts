@@ -9,6 +9,9 @@ export function onPacket(listener: (packet: ArrayBuffer, from: string) => any) {
 }
 
 contextBridge.exposeInMainWorld('robocol', {
+    gamepadDebug: (() => { try { return process.env.FTCDS_GAMEPAD_DEBUG === '1'; } catch { return false; } })(),
+    rumbleDebug: (() => { try { return process.env.FTCDS_RUMBLE_DEBUG === '1' || process.env.FTCDS_GAMEPAD_DEBUG === '1'; } catch { return false; } })(),
+    rumble: (vendor: string, product: string, large: number, small: number) => ipcRenderer.invoke('rumble', vendor, product, large, small),
     sendPacket,
     onPacket,
 });

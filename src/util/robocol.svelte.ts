@@ -5,6 +5,7 @@ import Telemetry from '../librobocol/packets/telemetry';
 import { RobotState } from '../librobocol/types';
 import Command from '../librobocol/packets/command';
 import Gamepad from '../librobocol/packets/gamepad';
+import { parseRumbleEffect, parseVendorProduct, RumblePlayer } from './rumble';
 
 export const connection = $state({
     remote: null,
@@ -74,6 +75,51 @@ export const robotControl = $state({
     },
 });
 
+// Transient notice shown at the top of the telemetry panel (gamepad bind/unbind, keyboard toggles)
+export const notice = $state({ text: '', id: 0 });
+let noticeTimer: any = null;
+
+export function showNotice(text: string, ms = 4000) {
+    notice.text = text;
+    notice.id++;
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => (notice.text = ''), ms);
+}
+
+const rumbleDebug = !!(window as any).robocol?.rumbleDebug;
+const rumbleLog = (...args: any[]) => { if (rumbleDebug) console.log('[rumble]', ...args); };
+
+// Rumble backend: Gamepad.vibrationActuator for standard-mapped pads that have one,
+// otherwise the main-process hidraw fallback (DS4 output report 0x05) matched by vendor/product from Gamepad.id.
+function rumbleOutput(user: number, large: number, small: number, durationMs: number) {
+    const slot = user === 1 ? connection.gamepad1 : connection.gamepad2;
+    if (slot.keyboard || slot.index < 0) { rumbleLog(`user ${user}: no physical gamepad bound, skipped`, { large, small, durationMs }); return; }
+
+    const pad = navigator.getGamepads()[slot.index];
+    if (!pad) { rumbleLog(`user ${user}: gamepad ${slot.index} gone`); return; }
+
+    const actuator = (pad as any).vibrationActuator;
+    const vp = parseVendorProduct(pad.id);
+
+    const viaActuator = () => {
+        if (!actuator) { rumbleLog(`user ${user}: no vibrationActuator and no hidraw device for`, pad.id); return; }
+        const p = large || small
+            ? actuator.playEffect('dual-rumble', { duration: durationMs > 0 ? durationMs : 5000, strongMagnitude: large / 255, weakMagnitude: small / 255 })
+            : actuator.reset?.();
+        Promise.resolve(p).catch((e: any) => rumbleLog('vibrationActuator failed', e));
+        rumbleLog(`user ${user}: vibrationActuator`, { large, small, durationMs });
+    };
+
+    if ((pad.mapping === 'standard' && actuator) || !vp || !(window as any).robocol?.rumble) return viaActuator();
+
+    (window as any).robocol.rumble(vp.vendor, vp.product, large, small).then((r: any) => {
+        rumbleLog(`user ${user}: hidraw`, { large, small, durationMs }, r);
+        if (!r?.ok && (r?.error === 'no-device' || r?.error === 'unsupported-platform')) viaActuator();
+    }).catch((e: any) => rumbleLog('hidraw ipc failed', e));
+}
+
+export const rumble = new RumblePlayer(rumbleOutput);
+
 export const popouts = $state({
     stackTrace: null,
     graphing: null,
@@ -119,6 +165,7 @@ export enum Commands {
     NotifyInitOpMode = 'CMD_NOTIFY_INIT_OP_MODE',
     NotifyRunOpMode = 'CMD_NOTIFY_RUN_OP_MODE',
     ShowStacktrace = 'CMD_SHOW_STACKTRACE',
+    RumbleEffect = 'CMD_RUMBLE_EFFECT',
 }
 
 function onTimerEnd() {
@@ -182,6 +229,7 @@ export function loop() {
     tickTimer();
 
     if (!connection.active || Date.now() - connection.lastHeartbeat > ASSUME_DISCONNECT_TIMER && !!connection.remote) {
+        if (connection.remote) rumble.stopAll();
         connection.remote = null;
         connection.seqNum = 0;
 
@@ -352,6 +400,7 @@ function handleCommand(packet: Command) {
 
             if (robot.activeOpMode === DEFAULT_OP_MODE_NAME) {
                 robotControl.timer.start = null;
+                rumble.stopAll(); // never leave a continuous rumble running after stop
             }
 
             break;
@@ -370,6 +419,12 @@ function handleCommand(packet: Command) {
             }
 
             break;
+        case Commands.RumbleEffect: {
+            let effect = parseRumbleEffect(packet.extra);
+            rumbleLog('CMD_RUMBLE_EFFECT', JSON.stringify(packet.extra), effect ? `-> user ${effect.user}, ${effect.steps.length} step(s)` : '-> invalid');
+            if (effect) rumble.play(effect);
+            break;
+        }
         case Commands.ShowStacktrace:
             if (popouts.stackTrace && !popouts.stackTrace.closed) return;
 
