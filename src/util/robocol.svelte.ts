@@ -200,7 +200,7 @@ export function loop() {
             heartbeat.seqNum = ++connection.seqNum;
             heartbeat.timestamp = BigInt(Date.now()) * 1000000n;
             heartbeat.t0 = BigInt(Date.now());
-            heartbeat.timezoneId = 'GMT';
+            heartbeat.timezoneId = Intl.DateTimeFormat().resolvedOptions().timeZone || 'GMT';
 
             window.robocol.sendPacket(heartbeat.serialize().buffer, connection.remote);
         } else {
