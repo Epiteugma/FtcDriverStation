@@ -6,7 +6,8 @@
 	"license": "MIT",
 	"scripts": {
 		"build": "node build.mjs",
-		"start": "electron ."
+		"start": "electron .",
+		"test": "node tests/run.mjs"
 	},
 	"description": "",
 	"devDependencies": {
