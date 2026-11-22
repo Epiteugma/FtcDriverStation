@@ -4,6 +4,7 @@
     import Slider from '../Slider.svelte';
     import { sendCommand, robot, robotControl, popouts, DEFAULT_OP_MODE_NAME, Commands, TELEMETRY_SYSTEM_NONE_KEY, TELEMETRY_SYSTEM_WARNING_KEY, OpModeState } from '../../util/robocol.svelte';
     import { RobotState } from '../../librobocol/types';
+    import { TelemetryDisplayFormat, telemetryToHtml } from '../../util/telemetryFormat';
 
     let systemTelemetry = $derived.by(() => {
         if (!robot.systemTelemetry || robot.systemTelemetry.tag === TELEMETRY_SYSTEM_NONE_KEY) return '';
@@ -32,6 +33,9 @@
         let selectedOpMode = robot.opModes.find(o => o.name === robotControl.selectedOpMode);
         if (!selectedOpMode || selectedOpMode.flavor !== 'AUTONOMOUS') robotControl.queuedOpMode = '';
     });
+
+    // telemetry.setDisplayFormat(): CLASSIC = default font, MONOSPACE = monospace font (both keep whitespace), HTML = sanitized HTML
+    let userTelemetryHtml = $derived(robot.telemetryDisplayFormat === TelemetryDisplayFormat.Html ? telemetryToHtml(userTelemetry) : '');
 </script>
 
 <OpModeSelector opModes={robot.opModes} bind:selected={robotControl.selectedOpMode} />
@@ -106,7 +110,9 @@
 <div class="telemetry">
     <pre><span
         style="font-weight: bold; color: {robot.systemTelemetry?.tag === TELEMETRY_SYSTEM_WARNING_KEY ? 'var(--orange)' : 'var(--red)'}"
-    >{systemTelemetry}</span>{userTelemetry}</pre>
+    >{systemTelemetry}</span>{#if robot.telemetryDisplayFormat === TelemetryDisplayFormat.Html}<div class="user-telemetry html">{@html userTelemetryHtml}</div>{:else}<span
+        class="user-telemetry" class:monospace={robot.telemetryDisplayFormat === TelemetryDisplayFormat.Monospace}
+    >{userTelemetry}</span>{/if}</pre>
 </div>
 
 <style>
@@ -190,6 +196,23 @@
 
     pre, pre * {
         user-select: text;
+    }
+
+    .user-telemetry.monospace {
+        font-family: monospace;
+    }
+
+    /* Html.fromHtml() collapses whitespace; newlines were already turned into <br> */
+    .user-telemetry.html {
+        white-space: normal;
+    }
+
+    .user-telemetry.html :global(tt) {
+        font-family: monospace;
+    }
+
+    .user-telemetry.html :global(:is(p, div, blockquote, ul, h1, h2, h3, h4, h5, h6)) {
+        margin: 0.5em 0;
     }
 
     pre::selection, pre ::selection {
