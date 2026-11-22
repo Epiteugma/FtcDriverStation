@@ -65,6 +65,7 @@
     .preview {
         display: flex;
         flex-direction: column;
+        flex-shrink: 0;
         gap: 6px;
     }
 
@@ -110,7 +111,9 @@
         align-items: center;
         justify-content: center;
 
-        height: 200px;
+        /* scale with the window, leaving room for the telemetry below */
+        height: clamp(140px, calc(100vh - 540px), 340px);
+        flex-shrink: 0;
         border-radius: 10px;
         overflow: hidden;
         background: #111;

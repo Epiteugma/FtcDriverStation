@@ -218,6 +218,8 @@
         position: relative;
         display: flex;
         flex: 1;
+        /* shrink below its content and scroll instead of pushing the page (e.g. under the camera preview) */
+        min-height: 120px;
 
         border-radius: 10px;
         overflow: hidden;
@@ -229,6 +231,7 @@
 
     pre {
         flex: 1;
+        min-height: 0;
 
         padding: 10px;
         margin: 0;
@@ -246,14 +249,18 @@
     }
 
     pre::-webkit-scrollbar {
-        width: 1px;
-        height: 1px;
+        width: 8px;
+        height: 8px;
         appearance: none;
     }
 
     pre::-webkit-scrollbar-thumb {
-        box-shadow: inset 0 0 1px #000;
-        backdrop-filter: blur(5px);
+        border-radius: 4px;
+        background: #0003;
+    }
+
+    pre::-webkit-scrollbar-thumb:hover {
+        background: #0005;
     }
 
     .sep {
