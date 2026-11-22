@@ -13,6 +13,7 @@ Prerequisites: you must have [NodeJS](https://nodejs.org/ens) installed
 - Run `npm install` to download project dependencies
 - Run `npm run build` to build the app
 - Start the app using `npm start`
+- Run the tests using `npm test`
 
 ## Keyboard controller
 
@@ -29,3 +30,11 @@ Use the `K1` or `K2` button in the status bar to assign the keyboard to driver s
 | Start / back | `Enter`, `Backspace` |
 | Left / right stick button | `Shift`, `Control` |
 | D-pad | `I`, `J`, `K`, `L` |
+
+## Camera preview
+
+When an op mode that uses a camera (e.g. a `VisionPortal`) is initialized, the Robot Controller announces a camera
+stream and a camera icon appears next to *Telemetry*. Like the *Camera Stream* menu of the official Driver Station,
+it can be opened after INIT and before START. It is not a live stream: each click on the image or on *Refresh* asks
+the Robot Controller for one frame. While the preview is open the gamepads are disabled and the op mode cannot be
+started; close the preview to continue.

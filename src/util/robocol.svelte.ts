@@ -5,6 +5,8 @@ import Telemetry from '../librobocol/packets/telemetry';
 import { RobotState } from '../librobocol/types';
 import Command from '../librobocol/packets/command';
 import Gamepad from '../librobocol/packets/gamepad';
+import { ReceiveFrameBegin, ReceiveFrameChunk, StreamChange } from '../librobocol/commands/cameraStream';
+import { CameraPreviewController, createCameraPreviewState } from './cameraPreview';
 
 export const connection = $state({
     remote: null,
@@ -16,6 +18,9 @@ export const connection = $state({
     seqNum: 0,
     lastPing: 0,
     lastHeartbeat: 0,
+
+    /** no gamepad packets are sent while true (camera preview open, like the official DS) */
+    gamepadsBlocked: false,
 
     gamepad1: {
         index: -1,
@@ -74,6 +79,30 @@ export const robotControl = $state({
     },
 });
 
+export const cameraPreviewState = $state(createCameraPreviewState());
+
+export const cameraPreview = new CameraPreviewController(cameraPreviewState, {
+    sendRequestFrame: () => {
+        if (!connection.remote) return false;
+
+        sendCommand(Commands.RequestFrame, '');
+        return true;
+    },
+    setGamepadsBlocked,
+    createObjectURL: blob => URL.createObjectURL(blob),
+    revokeObjectURL: url => URL.revokeObjectURL(url),
+    decodeImage: async blob => {
+        let bitmap = await createImageBitmap(blob);
+        let size = { width: bitmap.width, height: bitmap.height };
+
+        bitmap.close();
+        return size;
+    },
+    setTimeout: (fn, ms) => window.setTimeout(fn, ms),
+    clearTimeout: handle => window.clearTimeout(handle),
+    now: () => Date.now(),
+});
+
 export const popouts = $state({
     stackTrace: null,
     graphing: null,
@@ -119,6 +148,11 @@ export enum Commands {
     NotifyInitOpMode = 'CMD_NOTIFY_INIT_OP_MODE',
     NotifyRunOpMode = 'CMD_NOTIFY_RUN_OP_MODE',
     ShowStacktrace = 'CMD_SHOW_STACKTRACE',
+
+    StreamChange = 'CMD_STREAM_CHANGE',
+    RequestFrame = 'CMD_REQUEST_FRAME',
+    ReceiveFrameBegin = 'CMD_RECEIVE_FRAME_BEGIN',
+    ReceiveFrameChunk = 'CMD_RECEIVE_FRAME_CHUNK',
 }
 
 function onTimerEnd() {
@@ -182,6 +216,8 @@ export function loop() {
     tickTimer();
 
     if (!connection.active || Date.now() - connection.lastHeartbeat > ASSUME_DISCONNECT_TIMER && !!connection.remote) {
+        if (connection.remote || cameraPreviewState.open || cameraPreviewState.available) cameraPreview.onDisconnect();
+
         connection.remote = null;
         connection.seqNum = 0;
 
@@ -211,37 +247,68 @@ export function loop() {
 
     processQueuedCommands();
 
-    if (connection.gamepad1.latestData && connection.gamepad1.needsUpdate) {
-        if (connection.gamepad1.index === -1) {
-            connection.gamepad1.latestData = new Gamepad();
-            connection.gamepad1.latestData.user = 1;
-            connection.gamepad1.latestData.id = -2;
-        }
+    if (connection.gamepadsBlocked) return;
 
-        connection.gamepad1.latestData.seqNum = ++connection.seqNum;
-        connection.gamepad1.latestData.timestamp = BigInt(Date.now());
+    flushGamepad(connection.gamepad1, 1);
+    flushGamepad(connection.gamepad2, 2);
+}
 
-        window.robocol.sendPacket(connection.gamepad1.latestData.serialize().buffer, connection.remote);
-        connection.gamepad1.needsUpdate = false;
+function flushGamepad(gamepad: typeof connection.gamepad1, user: number, force = false) {
+    if (!gamepad.latestData || !gamepad.needsUpdate && !force) return;
+
+    if (gamepad.index === -1) {
+        gamepad.latestData = new Gamepad();
+        gamepad.latestData.user = user;
+        gamepad.latestData.id = -2;
     }
 
-    if (connection.gamepad2.latestData && connection.gamepad2.needsUpdate) {
-        if (connection.gamepad2.index === -1) {
-            connection.gamepad2.latestData = new Gamepad();
-            connection.gamepad2.latestData.user = 2;
-            connection.gamepad2.latestData.id = -2;
-        }
+    sendGamepadPacket(gamepad.latestData);
+    gamepad.needsUpdate = false;
+}
 
-        connection.gamepad2.latestData.seqNum = ++connection.seqNum;
-        connection.gamepad2.latestData.timestamp = BigInt(Date.now());
+function sendGamepadPacket(gamepad: Gamepad) {
+    gamepad.seqNum = ++connection.seqNum;
+    gamepad.timestamp = BigInt(Date.now());
 
-        window.robocol.sendPacket(connection.gamepad2.latestData.serialize().buffer, connection.remote);
-        connection.gamepad2.needsUpdate = false;
+    window.robocol.sendPacket(gamepad.serialize().buffer, connection.remote);
+}
+
+/**
+ * Central switch for gamepad input. The official DS stops sending gamepads while its camera stream is open
+ * (DriverStationGamepadManager.setEnabled(false)). We additionally send one neutral packet per gamepad when
+ * blocking so the RC does not keep the last stick/button state, and resend the real state when unblocking.
+ */
+export function setGamepadsBlocked(blocked: boolean) {
+    if (connection.gamepadsBlocked === blocked) return;
+    connection.gamepadsBlocked = blocked;
+
+    if (!connection.remote) return;
+
+    if (!blocked) {
+        flushGamepad(connection.gamepad1, 1, true);
+        flushGamepad(connection.gamepad2, 2, true);
+        return;
+    }
+
+    for (let gamepad of [connection.gamepad1, connection.gamepad2]) {
+        let latest = gamepad.latestData as Gamepad | null;
+        if (!latest) continue;
+
+        let neutral = new Gamepad();
+
+        neutral.user = latest.user;
+        neutral.id = latest.id;
+        neutral.type = latest.type;
+
+        sendGamepadPacket(neutral);
     }
 }
 
 export function sendCommand(name: string, extra?: any) {
     if (!connection.remote) return;
+
+    // never start or re-init an op mode with the camera preview open (it blocks the gamepads)
+    if (name === Commands.RunOpMode || name === Commands.InitOpMode) cameraPreview.close();
 
     let command = new Command();
 
@@ -273,6 +340,8 @@ function handle(packet: DeserializeResult, from: string) {
     if (packet instanceof PeerDiscovery && !connection.remote) {
         connection.overridden = packet.peerType === PeerType.NotConnectedDueToPreexistingConnection;
         if (packet.peerType !== PeerType.Peer) return;
+
+        cameraPreview.onDisconnect(); // fresh connection: the RC re-announces the stream on its next INIT
 
         connection.remote = from;
         connection.seqNum = 0;
@@ -334,7 +403,7 @@ function handleCommand(packet: Command) {
         return;
     }
 
-    console.log('%c <- ', 'background-color: orange; color: white', packet);
+    if (packet.name !== Commands.ReceiveFrameChunk) console.log('%c <- ', 'background-color: orange; color: white', packet);
 
     let ack = new Command(); // outgoing ACK
 
@@ -350,6 +419,7 @@ function handleCommand(packet: Command) {
             robot.opModes = packet.extra;
             break;
         case Commands.NotifyInitOpMode:
+            cameraPreview.close();
             robot.activeOpMode = packet.extra;
             robot.opModeState = OpModeState.Init;
 
@@ -359,6 +429,7 @@ function handleCommand(packet: Command) {
 
             break;
         case Commands.NotifyRunOpMode:
+            cameraPreview.close(); // the official DS closes the stream when the op mode starts
             robot.activeOpMode = packet.extra;
             robot.opModeState = OpModeState.Looping;
 
@@ -409,6 +480,15 @@ function handleCommand(packet: Command) {
             break;
         case Commands.DiscoverLynxModulesResp:
             robot.onModuleDiscoveryResponse?.(packet.extra);
+            break;
+        case Commands.StreamChange:
+            cameraPreview.setAvailable(StreamChange.deserialize(packet.extra).streamAvailable);
+            break;
+        case Commands.ReceiveFrameBegin:
+            cameraPreview.onBegin(ReceiveFrameBegin.deserialize(packet.extra));
+            break;
+        case Commands.ReceiveFrameChunk:
+            cameraPreview.onChunk(ReceiveFrameChunk.deserialize(packet.extra));
             break;
     }
 }

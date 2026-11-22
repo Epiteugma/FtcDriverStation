@@ -9,7 +9,7 @@
     import Configuration from './tabs/Configuration.svelte';
 
     import { RobotState } from '../librobocol/types';
-    import { connection, robot, popouts, loop, DEFAULT_OP_MODE_NAME, OpModeState } from '../util/robocol.svelte';
+    import { connection, robot, popouts, loop, cameraPreview, DEFAULT_OP_MODE_NAME, OpModeState } from '../util/robocol.svelte';
     import { onMount } from 'svelte';
 
     const tabs = [RobotControl, Configuration];
@@ -38,6 +38,7 @@
 </script>
 
 <svelte:window onbeforeunload={(event) => {
+    cameraPreview.close();
     if (popouts.stackTrace && !popouts.stackTrace.closed) popouts.stackTrace.close();
     if (popouts.graphing && !popouts.graphing.closed) popouts.graphing.close();
     if (popouts.fieldView && !popouts.fieldView.closed) popouts.fieldView.close();
