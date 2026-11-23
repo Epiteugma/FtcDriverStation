@@ -190,6 +190,38 @@ describe('DS <-> mock Robot Controller (SDK 12.0 camera stream)', () => {
         assert.equal(objectUrls.size, 0);
     });
 
+    test('disconnect cleanup survives a throwing gamepad restore: preview reset and connection dropped', async () => {
+        mockRc.announce();
+        mockRc.sendCommand('CMD_STREAM_CHANGE', 'true');
+        setGamepad1(0.5);
+        cameraPreview.open();
+        sendFrame(sdkJpeg, 7, [1]);
+        assert.equal(preview.status, 'receiving');
+        assert.equal(connection.gamepadsBlocked, true);
+
+        // the link is gone: restoring the gamepads on close throws while sending
+        let bridge = (globalThis as any).window.robocol;
+        let send = bridge.sendPacket;
+        bridge.sendPacket = () => { throw new Error('network down'); };
+        let errors = console.error;
+        console.error = () => {};
+
+        try {
+            connection.lastHeartbeat = 0; // heartbeat timeout
+            assert.doesNotThrow(() => loop());
+        } finally {
+            bridge.sendPacket = send;
+            console.error = errors;
+        }
+
+        assert.equal(connection.remote, null);
+        assert.equal(preview.open, false);
+        assert.equal(preview.available, false);
+        assert.equal(preview.status, 'unavailable');
+        assert.equal(connection.gamepadsBlocked, false);
+        assert.equal(objectUrls.size, 0);
+    });
+
     test('reconnect: preview needs a new CMD_STREAM_CHANGE, frame counter may restart at 0', async () => {
         mockRc.announce();
         assert.equal(connection.remote, '192.168.43.1');

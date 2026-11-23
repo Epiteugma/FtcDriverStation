@@ -216,7 +216,9 @@ export function loop() {
     tickTimer();
 
     if (!connection.active || Date.now() - connection.lastHeartbeat > ASSUME_DISCONNECT_TIMER && !!connection.remote) {
-        if (connection.remote || cameraPreviewState.open || cameraPreviewState.available) cameraPreview.onDisconnect();
+        // resetCameraPreview never throws, so the connection state below is always reset. Cleanup that can throw
+        // (e.g. gamepad rumble) must run in a try with this in its finally.
+        if (connection.remote || cameraPreviewState.open || cameraPreviewState.available) resetCameraPreview();
 
         connection.remote = null;
         connection.seqNum = 0;
@@ -271,6 +273,18 @@ function sendGamepadPacket(gamepad: Gamepad) {
     gamepad.timestamp = BigInt(Date.now());
 
     window.robocol.sendPacket(gamepad.serialize().buffer, connection.remote);
+}
+
+/**
+ * Drop all camera preview state for a lost or new connection. Never throws: the preview state is reset even if
+ * restoring the gamepads fails, and a failure must not abort the rest of the disconnect/connect handling.
+ */
+function resetCameraPreview() {
+    try {
+        cameraPreview.onDisconnect();
+    } catch (e) {
+        console.error('Camera preview cleanup failed', e);
+    }
 }
 
 /**
@@ -341,7 +355,7 @@ function handle(packet: DeserializeResult, from: string) {
         connection.overridden = packet.peerType === PeerType.NotConnectedDueToPreexistingConnection;
         if (packet.peerType !== PeerType.Peer) return;
 
-        cameraPreview.onDisconnect(); // fresh connection: the RC re-announces the stream on its next INIT
+        resetCameraPreview(); // fresh connection: the RC re-announces the stream on its next INIT
 
         connection.remote = from;
         connection.seqNum = 0;

@@ -112,15 +112,17 @@ export class CameraPreviewController {
 
     /** Close the preview: drops any partial frame, revokes the image and always restores the gamepads. */
     close() {
-        this.cancelRequest();
-        this.revokeImage();
+        try {
+            this.cancelRequest();
+            this.revokeImage();
+        } finally {
+            this.state.open = false;
+            this.state.status = this.state.available ? 'idle' : 'unavailable';
+            this.state.message = '';
 
-        this.state.open = false;
-        this.state.status = this.state.available ? 'idle' : 'unavailable';
-        this.state.message = '';
-
-        // unconditionally: setGamepadsBlocked is idempotent and this guarantees nothing stays blocked
-        this.deps.setGamepadsBlocked(false);
+            // unconditionally: setGamepadsBlocked is idempotent and this guarantees nothing stays blocked
+            this.deps.setGamepadsBlocked(false);
+        }
     }
 
     /** Request exactly one frame. Ignored while another request is in flight (no accidental live stream). */
@@ -184,11 +186,15 @@ export class CameraPreviewController {
 
     /** Connection lost (or a new one): forget availability and any frame state. */
     onDisconnect() {
-        this.close();
-        this.assembler.reset();
-        this.state.available = false;
-        this.state.status = 'unavailable';
-        this.state.frameNum = -1;
+        try {
+            this.close(); // may throw if restoring the gamepads fails (e.g. the send fails while the link is down)
+        } finally {
+            this.inFlight = 0;
+            this.assembler.reset();
+            this.state.available = false;
+            this.state.status = 'unavailable';
+            this.state.frameNum = -1;
+        }
     }
 
     private finish(frameNum: number, data: Uint8Array) {
@@ -247,9 +253,11 @@ export class CameraPreviewController {
     }
 
     private revokeImage() {
-        if (this.state.imageUrl) this.deps.revokeObjectURL(this.state.imageUrl);
-
+        let url = this.state.imageUrl;
         this.state.imageUrl = null;
+
+        if (url) this.deps.revokeObjectURL(url);
+
         this.state.width = 0;
         this.state.height = 0;
         this.state.byteLength = 0;

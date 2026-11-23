@@ -380,4 +380,37 @@ describe('camera preview controller', () => {
         preview.setAvailable(false);
         assert.equal(isGamepadBlocked(), false);
     });
+
+    test('disconnect still resets everything when an earlier cleanup step throws', async () => {
+        preview.setAvailable(true);
+        preview.open();
+        await deliver(sdkJpeg, 1);
+        assert.equal(state.status, 'ready');
+
+        preview.request();
+        preview.onBegin(beginOf(sdkJpeg, 2));
+        preview.onChunk(chunksOf(sdkJpeg, 2)[0]);
+        assert.equal(state.status, 'receiving');
+
+        let unblockAttempts = 0;
+        let imageUrl = state.imageUrl;
+        // both the image revoke and the gamepad restore fail (e.g. the send fails while the link is down)
+        (preview as any).deps.revokeObjectURL = () => { throw new Error('revoke failed'); };
+        (preview as any).deps.setGamepadsBlocked = (b: boolean) => { if (!b) unblockAttempts++; throw new Error('send failed'); };
+
+        assert.throws(() => preview.onDisconnect(), /revoke failed|send failed/);
+
+        assert.equal(unblockAttempts, 1, 'gamepad restore is still attempted after the revoke failed');
+        assert.equal(state.open, false);
+        assert.equal(state.available, false);
+        assert.equal(state.status, 'unavailable');
+        assert.equal(state.imageUrl, null);
+        assert.equal(state.receivedBytes, 0);
+        assert.notEqual(imageUrl, null);
+
+        // the old frame's late chunks are ignored and nothing is stuck in flight
+        preview.onChunk(chunksOf(sdkJpeg, 2)[1]);
+        assert.equal(state.status, 'unavailable');
+        assert.equal(timers.pending, 0);
+    });
 });
