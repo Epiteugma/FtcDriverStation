@@ -2,7 +2,8 @@
     import OpModeSelector from '../OpModeSelector.svelte';
     import OpModePreselect from '../OpModePreselect.svelte';
     import Slider from '../Slider.svelte';
-    import { sendCommand, robot, robotControl, popouts, DEFAULT_OP_MODE_NAME, Commands, TELEMETRY_SYSTEM_NONE_KEY, TELEMETRY_SYSTEM_WARNING_KEY, OpModeState } from '../../util/robocol.svelte';
+    import CameraPreview from '../CameraPreview.svelte';
+    import { sendCommand, robot, robotControl, popouts, cameraPreview, cameraPreviewState, DEFAULT_OP_MODE_NAME, Commands, TELEMETRY_SYSTEM_NONE_KEY, TELEMETRY_SYSTEM_WARNING_KEY, OpModeState } from '../../util/robocol.svelte';
     import { RobotState } from '../../librobocol/types';
 
     let systemTelemetry = $derived.by(() => {
@@ -28,6 +29,9 @@
         return out;
     });
 
+    // like the official DS: the camera stream can only be opened while an op mode is initialized and not started yet
+    let canOpenPreview = $derived(cameraPreviewState.available && robot.state === RobotState.Running && robot.opModeState === OpModeState.Init && robot.activeOpMode !== DEFAULT_OP_MODE_NAME);
+
     $effect(() => {
         let selectedOpMode = robot.opModes.find(o => o.name === robotControl.selectedOpMode);
         if (!selectedOpMode || selectedOpMode.flavor !== 'AUTONOMOUS') robotControl.queuedOpMode = '';
@@ -37,7 +41,8 @@
 <OpModeSelector opModes={robot.opModes} bind:selected={robotControl.selectedOpMode} />
 
 <div class="controls">
-    <button class="{robot.opModeState === OpModeState.Init && robot.activeOpMode !== DEFAULT_OP_MODE_NAME ? 'run' : ''}" disabled={
+    <button class="{robot.opModeState === OpModeState.Init && robot.activeOpMode !== DEFAULT_OP_MODE_NAME ? 'run' : ''}" title={cameraPreviewState.open ? 'Close the camera preview first' : ''} disabled={
+        cameraPreviewState.open ||
         robot.opModes.findIndex((o: any) => o.name === robotControl.selectedOpMode) < 0 || robot.state !== RobotState.Running || robot.opModeState !== OpModeState.Init && (robot.opModeState !== OpModeState.Looping || robot.activeOpMode !== DEFAULT_OP_MODE_NAME)
     } onclick={() => {
         sendCommand(robot.opModeState === OpModeState.Init && robot.activeOpMode !== DEFAULT_OP_MODE_NAME ? Commands.RunOpMode : Commands.InitOpMode, robotControl.selectedOpMode);
@@ -45,7 +50,10 @@
 
     <button class="danger" disabled={
         robot.state !== RobotState.Running || (robot.opModeState !== OpModeState.Init && robot.opModeState !== OpModeState.Looping) || robot.activeOpMode === DEFAULT_OP_MODE_NAME
-    } onclick={() => sendCommand(Commands.InitOpMode, DEFAULT_OP_MODE_NAME)}>Stop</button>
+    } onclick={() => {
+        cameraPreview.close();
+        sendCommand(Commands.InitOpMode, DEFAULT_OP_MODE_NAME);
+    }}>Stop</button>
 
     <OpModePreselect disabled={(() => {
         let selectedOpMode = robot.opModes.find(o => o.name === robotControl.selectedOpMode);
@@ -59,6 +67,9 @@
 
 <div class="sep"></div>
 
+{#if cameraPreviewState.open}
+<CameraPreview />
+{:else}
 <div class="timer-holder">
     <h2 class="timer" style="width:120px">{robotControl.timer.formatted}</h2>
     <div class="timer-controls">
@@ -78,11 +89,23 @@
         </div>
     </div>
 </div>
+{/if}
 
 <div class="sep"></div>
 
 <h2>
     Telemetry
+
+    {#if cameraPreviewState.available}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <svg class="camera" class:disabled={!canOpenPreview} xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" onclick={() => {
+            if (canOpenPreview) cameraPreview.open();
+        }}>
+            <title>{canOpenPreview ? 'Camera Preview' : 'Camera Preview (available after INIT, before START)'}</title>
+            <path d="M480-260q75 0 127.5-52.5T660-440q0-75-52.5-127.5T480-620q-75 0-127.5 52.5T300-440q0 75 52.5 127.5T480-260Zm0-80q-42 0-71-29t-29-71q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29ZM160-120q-33 0-56.5-23.5T80-200v-480q0-33 23.5-56.5T160-760h126l74-80h240l74 80h126q33 0 56.5 23.5T880-680v480q0 33-23.5 56.5T800-120H160Z"/>
+        </svg>
+    {/if}
 
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -158,6 +181,31 @@
         margin-left: auto;
         transition: .2s;
     }
+
+    .camera {
+        width: 24px;
+        height: 24px;
+        margin-left: auto;
+        margin-right: 5px;
+        transition: .2s;
+    }
+
+    .camera + .field-view {
+        margin-left: 0;
+    }
+
+    .camera:hover {
+        fill: var(--primary);
+    }
+
+    .camera.disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .camera.disabled:hover {
+        fill: currentColor;
+    }
     .graphing:hover {
         fill: #04991c;
     }
@@ -170,6 +218,8 @@
         position: relative;
         display: flex;
         flex: 1;
+        /* shrink below its content and scroll instead of pushing the page (e.g. under the camera preview) */
+        min-height: 120px;
 
         border-radius: 10px;
         overflow: hidden;
@@ -181,6 +231,7 @@
 
     pre {
         flex: 1;
+        min-height: 0;
 
         padding: 10px;
         margin: 0;
@@ -198,14 +249,18 @@
     }
 
     pre::-webkit-scrollbar {
-        width: 1px;
-        height: 1px;
+        width: 8px;
+        height: 8px;
         appearance: none;
     }
 
     pre::-webkit-scrollbar-thumb {
-        box-shadow: inset 0 0 1px #000;
-        backdrop-filter: blur(5px);
+        border-radius: 4px;
+        background: #0003;
+    }
+
+    pre::-webkit-scrollbar-thumb:hover {
+        background: #0005;
     }
 
     .sep {
